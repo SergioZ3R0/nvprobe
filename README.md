@@ -1,4 +1,4 @@
-# nvProbe
+# nvProbe: NVIDIA GPU & CUDA Benchmark Suite
 
 NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison.
 
