@@ -1,0 +1,67 @@
+name: default-benchmark
+description: >
+  Default benchmark suite for NVIDIA L40S / B200 GPUs.
+  Runs bandwidth, custom CUDA kernels, HPL, HPCG, and MLPerf.
+
+gpu:
+  models: []           # empty = all detected NVIDIA GPUs
+  min_count: 1
+
+slurm:
+  enabled: true
+  partition: gpu
+  account: ""
+  time_limit: "02:00:00"
+  gpus_per_node: 8
+  nodes: 1
+  exclude: ""
+  extra_args: []
+
+precisions:
+  - fp32
+  - fp16
+  - int8
+
+batch_sizes:
+  - 1
+  - 32
+  - 64
+  - 128
+  - 256
+
+benchmarks:
+  - name: bandwidth
+    enabled: true
+    params:
+      sizes_mb: [1, 4, 16, 64, 256, 1024, 4096]
+      iterations: 100
+
+  - name: custom
+    enabled: true
+    params:
+      kernels:
+        - matmul
+        - conv2d
+        - attention
+      matrix_sizes: [512, 1024, 2048, 4096]
+      iterations: 50
+
+  - name: hpl
+    enabled: true
+    params:
+      problem_sizes: [1024, 2048, 4096]
+      # HPL binary path (must be pre-installed on the cluster)
+      binary: "xhpl"
+
+  - name: hpcg
+    enabled: true
+    params:
+      grid_sizes: [64, 128, 256]
+      binary: "xhpcg"
+
+  - name: mlperf
+    enabled: false    # requires MLPerf suite installation
+    params:
+      scenario: inference
+      mode: performance
+      dataset: openimages
