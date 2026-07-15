@@ -170,4 +170,4 @@ make container-run      # runs with --nv GPU passthrough
 
 ## License
 
-Internal use.
+[Apache License 2.0](LICENSE)
