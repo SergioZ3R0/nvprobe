@@ -45,7 +45,7 @@ def run_bandwidth_test(
 
         # Warmup
         for _ in range(min(10, iterations)):
-            device_data.copy_from(host_data)
+            cp.copyto(device_data, host_data)
             cp.cuda.Stream.null.synchronize()
 
         # Host → Device
@@ -53,7 +53,7 @@ def run_bandwidth_test(
         end = cp.cuda.Event()
         start.record()
         for _ in range(iterations):
-            device_data.copy_from(host_data)
+            cp.copyto(device_data, host_data)
         end.record()
         end.synchronize()
         h2d_ms = cp.cuda.get_elapsed_time(start, end)
@@ -63,7 +63,7 @@ def run_bandwidth_test(
         # Device → Host
         start.record()
         for _ in range(iterations):
-            host_data.copy_from(device_data)
+            cp.copyto(host_data, device_data)
         end.record()
         end.synchronize()
         d2h_ms = cp.cuda.get_elapsed_time(start, end)
@@ -74,7 +74,7 @@ def run_bandwidth_test(
         device_data2 = cp.empty(n_elements, dtype=cupy_dtype)
         start.record()
         for _ in range(iterations):
-            device_data2.copy_from(device_data)
+            cp.copyto(device_data2, device_data)
         end.record()
         end.synchronize()
         d2d_ms = cp.cuda.get_elapsed_time(start, end)
