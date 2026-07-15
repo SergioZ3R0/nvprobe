@@ -1,0 +1,31 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+%labels
+    Author nvProbe Team
+    Version 0.1.0
+    Description NVIDIA GPU Benchmark Suite
+
+%post
+    apt-get update && apt-get install -y \
+        python3 python3-pip python3-venv \
+        && rm -rf /var/lib/apt/lists/*
+
+    python3 -m pip install --no-cache-dir \
+        typer pyyaml matplotlib jinja2 rich cupy-cuda12x
+
+    # Clone and install nvProbe
+    cd /opt
+    git clone https://github.com/SergioZ3R0/nvprobe.git
+    cd nvprobe
+    python3 -m pip install -e .
+
+%environment
+    export PATH="/opt/nvprobe:$PATH"
+    export PYTHONPATH="/opt/nvprobe:$PYTHONPATH"
+
+%runscript
+    exec python3 -m nvprobe.cli "$@"
+
+%test
+    python3 -m nvprobe.cli version
