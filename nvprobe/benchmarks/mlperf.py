@@ -47,18 +47,11 @@ class MlperfBenchmark(BaseBenchmark):
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+        """Return shell commands for this benchmark (without SBATCH headers)."""
         scenario = self.params.get("scenario", "inference")
         mode = self.params.get("mode", "performance")
         dataset = self.params.get("dataset", "openimages")
-        return f"""#!/bin/bash
-#SBATCH --job-name=nvprobe-mlperf
-#SBATCH --output=mlperf_%j.out
-#SBATCH --error=mlperf_%j.err
-#SBATCH --gpus=1
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-
-export CUDA_VISIBLE_DEVICES={gpu_index}
+        return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 python3 -m mlperf_{scenario} \\
     --gpu 0 \\

@@ -41,17 +41,10 @@ class HpcgBenchmark(BaseBenchmark):
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+        """Return shell commands for this benchmark (without SBATCH headers)."""
         binary = self.params.get("binary", "xhpcg")
         grid_sizes = self.params.get("grid_sizes", [128])
-        return f"""#!/bin/bash
-#SBATCH --job-name=nvprobe-hpcg
-#SBATCH --output=hpcg_%j.out
-#SBATCH --error=hpcg_%j.err
-#SBATCH --gpus=1
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-
-export CUDA_VISIBLE_DEVICES={gpu_index}
+        return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 for GS in {' '.join(str(s) for s in grid_sizes)}; do
     {binary} --grid $GS

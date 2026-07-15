@@ -41,17 +41,10 @@ class HplBenchmark(BaseBenchmark):
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+        """Return shell commands for this benchmark (without SBATCH headers)."""
         binary = self.params.get("binary", "xhpl")
         problem_sizes = self.params.get("problem_sizes", [2048])
-        return f"""#!/bin/bash
-#SBATCH --job-name=nvprobe-hpl
-#SBATCH --output=hpl_%j.out
-#SBATCH --error=hpl_%j.err
-#SBATCH --gpus=1
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-
-export CUDA_VISIBLE_DEVICES={gpu_index}
+        return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 for PS in {' '.join(str(s) for s in problem_sizes)}; do
     {binary} --problem-size $PS

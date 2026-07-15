@@ -93,5 +93,42 @@ def version() -> None:
     console.print(f"nvprobe {__version__}")
 
 
+@app.command(name="slurm")
+def slurm_cmd(
+    config: Path = typer.Option(
+        ..., "--config", "-c", help="YAML config file.",
+        exists=True, dir_okay=False, readable=True,
+    ),
+    output: Path = typer.Option(
+        Path("results"), "--output", "-o", help="Output directory.",
+    ),
+    action: str = typer.Option(
+        "generate", "--action", "-a",
+        help="Action: generate, submit, monitor, collect, or full (all steps).",
+    ),
+) -> None:
+    """Manage Slurm jobs: generate scripts, submit, monitor, collect results."""
+    from nvprobe.config import load_config
+    from nvprobe.slurm import SlurmManager
+
+    config_data = load_config(config)
+    manager = SlurmManager(config_data, output)
+
+    if action in ("generate", "full"):
+        scripts = manager.generate_scripts()
+
+    if action in ("submit", "full"):
+        if action == "submit":
+            scripts = list(manager.scripts_dir.glob("*.sh"))
+        manager.submit_all(scripts if action == "generate" else None)
+
+    if action in ("monitor", "full"):
+        manager.monitor()
+
+    if action in ("collect", "full"):
+        results = manager.collect_results()
+        console.print(f"[green]Collected {len(results)} results[/green]")
+
+
 if __name__ == "__main__":
     app()

@@ -48,17 +48,10 @@ class BandwidthBenchmark(BaseBenchmark):
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+        """Return shell commands for this benchmark (without SBATCH headers)."""
         sizes_mb = self.params.get("sizes_mb", [1, 4, 16, 64, 256, 1024])
         iterations = self.params.get("iterations", 100)
-        return f"""#!/bin/bash
-#SBATCH --job-name=nvprobe-bandwidth
-#SBATCH --output=bandwidth_%j.out
-#SBATCH --error=bandwidth_%j.err
-#SBATCH --gpus=1
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-
-export CUDA_VISIBLE_DEVICES={gpu_index}
+        return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 python3 -m nvprobe.benchmarks._cuda.bandwidth_test \\
     --gpu 0 \\
