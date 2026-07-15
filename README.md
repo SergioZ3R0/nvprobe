@@ -8,9 +8,10 @@ nvProbe runs standardized benchmarks across your GPU fleet, captures environment
 
 - **Benchmark modules**: Bandwidth, custom CUDA kernels (matmul, conv2d, attention), HPL, HPCG, MLPerf
 - **Slurm integration**: Generate and submit sbatch scripts, run across multiple nodes/GPUs
-- **Environment fingerprinting**: Driver version, CUDA version, GPU model, memory — captured automatically
+- **Environment fingerprinting**: Driver version, CUDA version, GPU model, memory, PCI bus ID — captured automatically
 - **SQLite storage**: All results persisted with full query capability
-- **HTML reports**: Self-contained reports with charts, comparison tables, and environment overview
+- **CSV/JSON export**: Raw data for programmatic access
+- **HTML reports**: Self-contained reports with matplotlib charts, sidebar navigation, and comparison views
 - **YAML configs**: Define test matrices (GPU models, precisions, batch sizes) declaratively
 - **Reproducible**: Same config + same hardware = same results
 
@@ -92,8 +93,9 @@ nvprobe/
 │   ├── cli.py              # CLI entry point
 │   ├── config.py           # YAML config loader
 │   ├── runner.py           # Benchmark orchestration
-│   ├── reporter.py         # HTML report generator
-│   ├── db.py               # SQLite storage
+│   ├── slurm.py            # Slurm job management
+│   ├── reporter.py         # HTML report generator with charts
+│   ├── db.py               # SQLite storage + CSV/JSON export
 │   └── benchmarks/
 │       ├── base.py         # Base benchmark class
 │       ├── bandwidth.py    # Memory bandwidth tests
@@ -109,6 +111,7 @@ nvprobe/
 │   └── default.yaml        # Default test configuration
 ├── reports/                 # Generated HTML reports
 ├── results/                 # Benchmark results (SQLite + JSON)
+├── README.md
 └── pyproject.toml
 ```
 
@@ -130,19 +133,19 @@ nvprobe/
 - MLPerf inference/training wrapper
 - Optional cupy dependency (`pip install nvprobe[cuda]`)
 
-### v0.3.0 — Slurm integration (next)
+### v0.3.0 — Slurm integration ✓
 - sbatch script generation
 - Job submission and monitoring
 - Multi-GPU parallel execution
 - Result collection from Slurm output
 
-### v0.4.0 — Reporting
-- Matplotlib charts (bar, scaling, efficiency)
-- Corporate branding (logo, fonts, sidebar)
+### v0.4.0 — Reporting ✓
+- Matplotlib charts (bandwidth, matmul, attention, GPU comparison)
+- Corporate branding (sidebar, color palette, env cards)
 - Comparison reports (A vs B)
-- CSV export
+- CSV/JSON auto-export alongside HTML
 
-### v0.5.0 — Reproducibility
+### v0.5.0 — Reproducibility (next)
 - Singularity container support
 - Environment fingerprinting
 - Git-tracked configs and results
