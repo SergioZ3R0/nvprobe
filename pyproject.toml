@@ -18,5 +18,9 @@ dependencies = [
 [project.scripts]
 nvprobe = "nvprobe.cli:app"
 
+[project.optional-dependencies]
+cuda = ["cupy-cuda12x>=13.0"]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
 [tool.setuptools.packages.find]
 include = ["nvprobe*"]

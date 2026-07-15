@@ -100,7 +100,11 @@ nvprobe/
 │       ├── custom.py       # Custom CUDA kernels
 │       ├── hpl.py          # HPL wrapper
 │       ├── hpcg.py         # HPCG wrapper
-│       └── mlperf.py       # MLPerf wrapper
+│       ├── mlperf.py       # MLPerf wrapper
+│       └── _cuda/
+│           ├── bandwidth_test.py   # CUDA bandwidth implementation
+│           ├── custom_kernels.py   # matmul/conv2d/attention
+│           └── utils.py            # Shared GPU utilities
 ├── configs/
 │   └── default.yaml        # Default test configuration
 ├── reports/                 # Generated HTML reports
@@ -110,7 +114,7 @@ nvprobe/
 
 ## Roadmap
 
-### v0.1.0 — Project base (current)
+### v0.1.0 — Project base ✓
 - CLI with Typer (run, report, compare, env, version)
 - YAML config system for test matrices
 - Benchmark module framework (base class + stubs)
@@ -119,13 +123,14 @@ nvprobe/
 - HTML report generator (basic)
 - Default config for L40S/B200 GPUs
 
-### v0.2.0 — CUDA benchmarks
-- Bandwidth test (host↔device, device↔device)
-- Custom CUDA kernels (matmul, conv2d, attention)
-- HPL/HPCG binary wrappers
-- MLPerf wrapper
+### v0.2.0 — CUDA benchmarks ✓
+- Bandwidth test (host↔device, device↔device) via cupy
+- Custom CUDA kernels: matmul, conv2d, attention
+- HPL/HPCG binary wrappers with Slurm script generation
+- MLPerf inference/training wrapper
+- Optional cupy dependency (`pip install nvprobe[cuda]`)
 
-### v0.3.0 — Slurm integration
+### v0.3.0 — Slurm integration (next)
 - sbatch script generation
 - Job submission and monitoring
 - Multi-GPU parallel execution
