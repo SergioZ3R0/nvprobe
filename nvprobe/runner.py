@@ -11,36 +11,12 @@ from typing import Any
 
 from nvprobe.benchmarks import BENCHMARK_REGISTRY
 from nvprobe.config import RunConfig, load_config
-from nvprobe.db import Database
+from nvprobe.db import Database, fingerprint_environment
 
 
 def detect_environment() -> dict[str, Any]:
     """Detect GPU environment: driver version, CUDA version, GPU models, etc."""
-    info: dict[str, Any] = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "hostname": _run_cmd(["hostname"]),
-        "driver_version": "",
-        "cuda_version": "",
-        "gpus": [],
-    }
-
-    try:
-        smi = _run_cmd(["nvidia-smi", "--query-gpu=driver_version,cuda_version,name,index,memory.total",
-                         "--format=csv,noheader,nounits"])
-        for line in smi.strip().splitlines():
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) >= 5:
-                info["driver_version"] = parts[0]
-                info["cuda_version"] = parts[1]
-                info["gpus"].append({
-                    "model": parts[2],
-                    "index": int(parts[3]),
-                    "memory_total_mb": int(parts[4]),
-                })
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        info["error"] = "nvidia-smi not available"
-
-    return info
+    return fingerprint_environment()
 
 
 def run_benchmarks(config_path: Path, output_dir: Path, dry_run: bool = False) -> None:

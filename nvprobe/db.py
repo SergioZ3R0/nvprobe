@@ -1,10 +1,13 @@
-"""SQLite database for benchmark results."""
+"""SQLite database for benchmark results with CSV/JSON export."""
 
 from __future__ import annotations
 
+import csv
 import json
 import sqlite3
+import subprocess
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -100,5 +103,105 @@ class Database:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_results_by_benchmark(self, run_id: int, benchmark: str) -> list[dict[str, Any]]:
+        """Return results filtered by benchmark name."""
+        rows = self._conn.execute(
+            "SELECT * FROM results WHERE run_id = ? AND benchmark = ? ORDER BY gpu_index, precision, batch_size",
+            (run_id, benchmark),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_results_by_gpu(self, run_id: int, gpu_model: str) -> list[dict[str, Any]]:
+        """Return results filtered by GPU model."""
+        rows = self._conn.execute(
+            "SELECT * FROM results WHERE run_id = ? AND gpu_model = ? ORDER BY benchmark, precision, batch_size",
+            (run_id, gpu_model),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def export_csv(self, run_id: int, output_path: Path) -> Path:
+        """Export results to CSV file."""
+        results = self.get_results(run_id)
+        if not results:
+            raise ValueError(f"No results found for run {run_id}")
+
+        csv_path = output_path.with_suffix(".csv")
+        fieldnames = ["benchmark", "gpu_model", "gpu_index", "precision", "batch_size",
+                       "elapsed_seconds", "success", "error", "metrics"]
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for r in results:
+                row = {k: r[k] for k in fieldnames if k in r}
+                writer.writerow(row)
+
+        return csv_path
+
+    def export_json(self, run_id: int, output_path: Path) -> Path:
+        """Export results to JSON file."""
+        run = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        if run is None:
+            raise ValueError(f"Run {run_id} not found")
+
+        results = self.get_results(run_id)
+        data = {
+            "run": dict(run),
+            "results": results,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        json_path = output_path.with_suffix(".json")
+        json_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+        return json_path
+
     def close(self) -> None:
         self._conn.close()
+
+
+def fingerprint_environment() -> dict[str, Any]:
+    """Capture detailed environment fingerprint for reproducibility."""
+    info: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "hostname": _run_cmd_safe(["hostname"]).strip(),
+        "kernel": _run_cmd_safe(["uname", "-r"]).strip(),
+        "driver_version": "",
+        "cuda_version": "",
+        "nvidia_smi_full": "",
+        "gpus": [],
+        "python_version": _run_cmd_safe(["python3", "--version"]).strip(),
+    }
+
+    smi = _run_cmd_safe(["nvidia-smi"])
+    info["nvidia_smi_full"] = smi
+
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version,cuda_version,name,index,memory.total,pci.bus_id",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, check=True,
+        )
+        for line in proc.stdout.strip().splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) >= 6:
+                info["driver_version"] = parts[0]
+                info["cuda_version"] = parts[1]
+                info["gpus"].append({
+                    "model": parts[2],
+                    "index": int(parts[3]),
+                    "memory_total_mb": int(parts[4]),
+                    "pci_bus_id": parts[5],
+                })
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    return info
+
+
+def _run_cmd_safe(cmd: list[str]) -> str:
+    """Run a command safely, returning empty string on failure."""
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return proc.stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return ""
