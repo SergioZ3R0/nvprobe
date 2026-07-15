@@ -145,7 +145,10 @@ nvprobe/
 - Comparison reports (A vs B)
 - CSV/JSON auto-export alongside HTML
 
-### v0.5.0 — Reproducibility (next)
+### v0.5.0 — Reproducibility ✓
+- Singularity container support (CUDA 12.4 runtime)
+- Makefile for common dev operations
+- Git-tracked configs and results
 - Singularity container support
 - Environment fingerprinting
 - Git-tracked configs and results
@@ -156,6 +159,14 @@ nvprobe/
 - NVIDIA GPU with CUDA drivers installed
 - Slurm (for multi-node execution)
 - `nvidia-smi` available in PATH
+- Singularity (optional, for containerized execution)
+
+## Container
+
+```bash
+make container-build    # builds nvprobe.sif
+make container-run      # runs with --nv GPU passthrough
+```
 
 ## License
 
