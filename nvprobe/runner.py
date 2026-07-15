@@ -36,6 +36,8 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
     if not gpus:
         print("WARNING: No GPUs detected via nvidia-smi. Assuming GPU 0.")
         gpus = [{"index": 0, "model": "unknown"}]
+    else:
+        print(f"Detected {len(gpus)} GPU(s): {', '.join(g['model'] for g in gpus)}")
 
     for bench_cfg in config.benchmarks:
         if not bench_cfg.enabled:
