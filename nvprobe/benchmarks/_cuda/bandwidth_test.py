@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 import cupy as cp
+import numpy as np
 
 from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json
 
@@ -40,7 +41,7 @@ def run_bandwidth_test(
 
     for size_mb in sizes_mb:
         n_elements = (size_mb * 1024 * 1024) // cupy_dtype.itemsize
-        host_data = cp.ones(n_elements, dtype=cupy_dtype)
+        host_data = np.ones(n_elements, dtype=np.float32)
         device_data = cp.empty(n_elements, dtype=cupy_dtype)
 
         # Warmup

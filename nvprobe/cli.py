@@ -124,7 +124,7 @@ def slurm_cmd(
     if action in ("submit", "full"):
         if action == "submit":
             scripts = list(manager.scripts_dir.glob("*.sh"))
-        manager.submit_all(scripts if action == "generate" else None)
+        manager.submit_all(scripts)
 
     if action in ("monitor", "full"):
         manager.monitor()

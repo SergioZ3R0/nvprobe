@@ -57,6 +57,8 @@ class RunConfig:
 def load_config(path: Path) -> RunConfig:
     """Load a YAML config file and return a validated RunConfig."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if raw is None:
+        raise ValueError(f"Config file is empty: {path}")
     return _parse_config(raw)
 
 

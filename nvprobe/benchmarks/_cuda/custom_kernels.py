@@ -16,7 +16,6 @@ import time
 from typing import Any
 
 import cupy as cp
-from cupyx.scipy import ndimage as cp_ndimage
 
 from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json
 
@@ -55,6 +54,7 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
 
 def bench_conv2d(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
     """Benchmark 2D convolution."""
+    from cupyx.scipy import ndimage as cp_ndimage
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
     results: dict[str, Any] = {}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import Any
 
@@ -21,7 +22,7 @@ class HplBenchmark(BaseBenchmark):
             proc = subprocess.run(
                 [binary, "--problem-size", str(problem_sizes[0])],
                 capture_output=True, text=True, timeout=3600, check=True,
-                env={"CUDA_VISIBLE_DEVICES": str(gpu_index)},
+                env={**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu_index)},
             )
             gflops = _parse_hpl_output(proc.stdout)
             return BenchmarkResult(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from typing import Any
 
 from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult
@@ -19,7 +20,7 @@ class MlperfBenchmark(BaseBenchmark):
         dataset = self.params.get("dataset", "openimages")
 
         cmd = [
-            "python3", "-m", "mlperf_" + scenario,
+            sys.executable, "-m", "mlperf_" + scenario,
             "--gpu", str(gpu_index),
             "--mode", mode,
             "--dataset", dataset,

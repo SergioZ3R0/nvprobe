@@ -139,7 +139,7 @@ class SlurmManager:
             f"#SBATCH --partition={slurm.partition}",
             f"#SBATCH --nodes={slurm.nodes}",
             f"#SBATCH --ntasks=1",
-            f"#SBATCH --gpus=1",
+            f"#SBATCH --gpus={slurm.gpus_per_node}",
             f"#SBATCH --time={slurm.time_limit}",
         ]
 

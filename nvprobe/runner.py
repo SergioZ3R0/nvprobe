@@ -32,46 +32,47 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
 
     run_id = db.create_run(config.name, config.description, env_info)
 
-    gpus = env_info.get("gpus", [])
-    if not gpus:
-        print("WARNING: No GPUs detected via nvidia-smi. Assuming GPU 0.")
-        gpus = [{"index": 0, "model": "unknown"}]
-    else:
-        print(f"Detected {len(gpus)} GPU(s): {', '.join(g['model'] for g in gpus)}")
+    try:
+        gpus = env_info.get("gpus", [])
+        if not gpus:
+            print("WARNING: No GPUs detected via nvidia-smi. Assuming GPU 0.")
+            gpus = [{"index": 0, "model": "unknown"}]
+        else:
+            print(f"Detected {len(gpus)} GPU(s): {', '.join(g['model'] for g in gpus)}")
 
-    for bench_cfg in config.benchmarks:
-        if not bench_cfg.enabled:
-            continue
+        for bench_cfg in config.benchmarks:
+            if not bench_cfg.enabled:
+                continue
 
-        bench_cls = BENCHMARK_REGISTRY.get(bench_cfg.name)
-        if bench_cls is None:
-            print(f"WARNING: unknown benchmark '{bench_cfg.name}', skipping")
-            continue
+            bench_cls = BENCHMARK_REGISTRY.get(bench_cfg.name)
+            if bench_cls is None:
+                print(f"WARNING: unknown benchmark '{bench_cfg.name}', skipping")
+                continue
 
-        benchmark = bench_cls(bench_cfg.params)
-        print(f"Running: {bench_cfg.name}")
+            benchmark = bench_cls(bench_cfg.params)
+            print(f"Running: {bench_cfg.name}")
 
-        for precision in config.precisions:
-            for batch_size in config.batch_sizes:
-                for gpu in gpus:
-                    gpu_index = gpu["index"]
+            for precision in config.precisions:
+                for batch_size in config.batch_sizes:
+                    for gpu in gpus:
+                        gpu_index = gpu["index"]
 
-                    if dry_run:
-                        print(f"  [dry-run] {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size}")
-                        continue
+                        if dry_run:
+                            print(f"  [dry-run] {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size}")
+                            continue
 
-                    print(f"  {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size} ... ", end="", flush=True)
-                    t0 = time.monotonic()
-                    result = benchmark.run_local(gpu_index, precision, batch_size)
-                    elapsed = time.monotonic() - t0
+                        print(f"  {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size} ... ", end="", flush=True)
+                        t0 = time.monotonic()
+                        result = benchmark.run_local(gpu_index, precision, batch_size)
+                        elapsed = time.monotonic() - t0
 
-                    status = "OK" if result.success else f"FAIL: {result.error}"
-                    print(f"{status} ({elapsed:.1f}s)")
+                        status = "OK" if result.success else f"FAIL: {result.error}"
+                        print(f"{status} ({elapsed:.1f}s)")
 
-                    db.insert_result(run_id, result, elapsed)
-
-    db.close()
-    print(f"\nResults saved to {output_dir}")
+                        db.insert_result(run_id, result, elapsed)
+    finally:
+        db.close()
+        print(f"\nResults saved to {output_dir}")
 
 
 def _run_cmd(cmd: list[str]) -> str:

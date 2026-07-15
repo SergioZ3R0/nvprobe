@@ -6,6 +6,7 @@ import csv
 import json
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
@@ -158,6 +159,12 @@ class Database:
     def close(self) -> None:
         self._conn.close()
 
+    def __enter__(self) -> "Database":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
 
 def fingerprint_environment() -> dict[str, Any]:
     """Capture detailed environment fingerprint for reproducibility."""
@@ -169,7 +176,7 @@ def fingerprint_environment() -> dict[str, Any]:
         "cuda_version": "",
         "nvidia_smi_full": "",
         "gpus": [],
-        "python_version": _run_cmd_safe(["python3", "--version"]).strip(),
+        "python_version": _run_cmd_safe([sys.executable, "--version"]).strip(),
     }
 
     smi = _run_cmd_safe(["nvidia-smi"])
