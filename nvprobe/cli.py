@@ -27,6 +27,9 @@ def run(
     output: Path = typer.Option(
         Path("results"), "--output", "-o", help="Directory for raw results (JSON/CSV).",
     ),
+    local: bool = typer.Option(
+        False, "--local", "-l", help="Run locally on this machine (no Slurm).",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would run without executing.",
     ),
@@ -37,10 +40,11 @@ def run(
     console.print(f"[bold green]nvprobe v{__version__}[/bold green]")
     console.print(f"Config:  {config}")
     console.print(f"Output:  {output}")
+    console.print(f"Local:   {local}")
     console.print(f"Dry run: {dry_run}")
     console.print()
 
-    run_benchmarks(config, output, dry_run=dry_run)
+    run_benchmarks(config, output, local=local, dry_run=dry_run)
 
 
 @app.command()

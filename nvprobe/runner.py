@@ -19,7 +19,7 @@ def detect_environment() -> dict[str, Any]:
     return fingerprint_environment()
 
 
-def run_benchmarks(config_path: Path, output_dir: Path, dry_run: bool = False) -> None:
+def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry_run: bool = False) -> None:
     """Run all enabled benchmarks from config, saving results to output_dir."""
     config = load_config(config_path)
     output_dir.mkdir(parents=True, exist_ok=True)
