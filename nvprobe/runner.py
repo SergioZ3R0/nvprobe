@@ -32,6 +32,11 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
 
     run_id = db.create_run(config.name, config.description, env_info)
 
+    gpus = env_info.get("gpus", [])
+    if not gpus:
+        print("WARNING: No GPUs detected via nvidia-smi. Assuming GPU 0.")
+        gpus = [{"index": 0, "model": "unknown"}]
+
     for bench_cfg in config.benchmarks:
         if not bench_cfg.enabled:
             continue
@@ -46,7 +51,7 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
 
         for precision in config.precisions:
             for batch_size in config.batch_sizes:
-                for gpu in env_info.get("gpus", []):
+                for gpu in gpus:
                     gpu_index = gpu["index"]
 
                     if dry_run:
