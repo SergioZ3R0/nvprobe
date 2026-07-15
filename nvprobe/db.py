@@ -194,8 +194,26 @@ def fingerprint_environment() -> dict[str, Any]:
                 })
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         info["nvidia_smi_error"] = str(exc)
-        if hasattr(exc, "stderr"):
-            info["nvidia_smi_stderr"] = exc.stderr or ""
+
+    if not info["gpus"]:
+        try:
+            import cupy as cp
+            count = cp.cuda.runtime.getDeviceCount()
+            for i in range(count):
+                props = cp.cuda.runtime.getDeviceProperties(i)
+                name = props.get("name", b"unknown")
+                if isinstance(name, bytes):
+                    name = name.decode()
+                info["gpus"].append({
+                    "model": str(name),
+                    "index": i,
+                    "memory_total_mb": 0,
+                    "pci_bus_id": "",
+                })
+                if not info["driver_version"]:
+                    info["driver_version"] = f"via cupy (CUDA {cp.cuda.runtime.runtimeGetVersion()})"
+        except Exception:
+            pass
 
     return info
 

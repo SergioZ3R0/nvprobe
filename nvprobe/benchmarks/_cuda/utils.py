@@ -19,11 +19,14 @@ def get_gpu_info(gpu_index: int) -> dict[str, Any]:
         import cupy as cp
         cp.cuda.Device(gpu_index).use()
         mem = cp.cuda.Device(gpu_index).mem_info
-        props = cp.cuda.runtime.getDeviceProperties()
+        props = cp.cuda.runtime.getDeviceProperties(gpu_index)
+        name = props.get("name", b"unknown")
+        if isinstance(name, bytes):
+            name = name.decode()
         return {
-            "model": props["name"].decode() if isinstance(props["name"], bytes) else str(props["name"]),
+            "model": str(name),
             "memory_total_mb": mem[1] // (1024 * 1024),
             "memory_free_mb": mem[0] // (1024 * 1024),
         }
-    except ImportError:
-        return {"model": "unknown (cupy not installed)", "memory_total_mb": 0, "memory_free_mb": 0}
+    except Exception as exc:
+        return {"model": f"unknown ({exc})", "memory_total_mb": 0, "memory_free_mb": 0}
