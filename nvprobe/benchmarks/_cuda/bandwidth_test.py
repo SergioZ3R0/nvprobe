@@ -34,14 +34,14 @@ def run_bandwidth_test(
         "fp16": cp.float16,
         "int8": cp.int8,
     }
-    dtype = dtype_map.get(precision, cp.float32)
+    cupy_dtype = cp.dtype(dtype_map.get(precision, cp.float32))
 
     results: dict[str, Any] = {"h2d": {}, "d2h": {}, "d2d": {}}
 
     for size_mb in sizes_mb:
-        n_elements = (size_mb * 1024 * 1024) // dtype.itemsize
-        host_data = cp.ones(n_elements, dtype=dtype)
-        device_data = cp.empty(n_elements, dtype=dtype)
+        n_elements = (size_mb * 1024 * 1024) // cupy_dtype.itemsize
+        host_data = cp.ones(n_elements, dtype=cupy_dtype)
+        device_data = cp.empty(n_elements, dtype=cupy_dtype)
 
         # Warmup
         for _ in range(min(10, iterations)):
@@ -71,7 +71,7 @@ def run_bandwidth_test(
         results["d2h"][str(size_mb)] = round(d2h_bw, 2)
 
         # Device → Device
-        device_data2 = cp.empty(n_elements, dtype=dtype)
+        device_data2 = cp.empty(n_elements, dtype=cupy_dtype)
         start.record()
         for _ in range(iterations):
             device_data2.copy_from(device_data)

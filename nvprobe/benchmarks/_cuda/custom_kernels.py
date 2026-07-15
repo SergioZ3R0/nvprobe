@@ -28,8 +28,8 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
     results: dict[str, Any] = {}
 
     for n in sizes:
-        a = cp.random.random((batch_size, n, n), dtype=dtype)
-        b = cp.random.random((batch_size, n, n), dtype=dtype)
+        a = cp.ones((batch_size, n, n), dtype=dtype)
+        b = cp.ones((batch_size, n, n), dtype=dtype)
 
         # Warmup
         for _ in range(min(5, iterations)):
@@ -62,8 +62,8 @@ def bench_conv2d(gpu_index: int, sizes: list[int], iterations: int, precision: s
     for n in sizes:
         channels = 64
         kernel_size = 3
-        inp = cp.random.random((batch_size, channels, n, n), dtype=dtype)
-        weight = cp.random.random((channels, channels, kernel_size, kernel_size), dtype=dtype)
+        inp = cp.ones((batch_size, channels, n, n), dtype=dtype)
+        weight = cp.ones((channels, channels, kernel_size, kernel_size), dtype=dtype)
 
         # Warmup using correlation (equivalent to conv2d)
         for _ in range(min(5, iterations)):
@@ -97,9 +97,9 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
 
     for seq_len in sizes:
         d_model = min(128, seq_len)  # head dimension
-        q = cp.random.random((batch_size, seq_len, d_model), dtype=dtype)
-        k = cp.random.random((batch_size, seq_len, d_model), dtype=dtype)
-        v = cp.random.random((batch_size, seq_len, d_model), dtype=dtype)
+        q = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
+        k = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
+        v = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
         scale = d_model ** -0.5
 
         # Warmup
