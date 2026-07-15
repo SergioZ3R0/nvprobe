@@ -5,8 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nvprobe"
 version = "0.1.0"
-description = "nvProbe — NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison"
+description = "NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison"
+readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.10"
+authors = [
+    { name = "SergioZ3R0" },
+]
+keywords = ["gpu", "nvidia", "cuda", "benchmark", "hpc", "slurm", "mlperf"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Benchmark",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "typer>=0.9.0",
     "pyyaml>=6.0",
@@ -14,6 +32,11 @@ dependencies = [
     "jinja2>=3.1",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/SergioZ3R0/nvprobe"
+Repository = "https://github.com/SergioZ3R0/nvprobe"
+Issues = "https://github.com/SergioZ3R0/nvprobe/issues"
 
 [project.scripts]
 nvprobe = "nvprobe.cli:app"
