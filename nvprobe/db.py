@@ -192,8 +192,10 @@ def fingerprint_environment() -> dict[str, Any]:
                     "memory_total_mb": int(parts[4]),
                     "pci_bus_id": parts[5],
                 })
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        info["nvidia_smi_error"] = str(exc)
+        if hasattr(exc, "stderr"):
+            info["nvidia_smi_stderr"] = exc.stderr or ""
 
     return info
 
