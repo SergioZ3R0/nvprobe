@@ -6,7 +6,7 @@ install:
 	pip install -e .
 
 dev:
-	pip install -e ".[cuda,dev]"
+	pip install -e ".[dev]"
 
 test:
 	python -m pytest tests/ -v

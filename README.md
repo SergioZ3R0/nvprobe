@@ -23,6 +23,12 @@ cd nvprobe
 pip install -e .
 ```
 
+### Or install from PyPI
+
+```bash
+pip install nvprobe
+```
+
 ### Detect GPU environment
 
 ```bash

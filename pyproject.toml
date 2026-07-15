@@ -31,6 +31,7 @@ dependencies = [
     "matplotlib>=3.7",
     "jinja2>=3.1",
     "rich>=13.0",
+    "cupy-cuda12x>=13.0",
 ]
 
 [project.urls]
@@ -42,7 +43,6 @@ Issues = "https://github.com/SergioZ3R0/nvprobe/issues"
 nvprobe = "nvprobe.cli:app"
 
 [project.optional-dependencies]
-cuda = ["cupy-cuda12x>=13.0"]
 dev = ["pytest>=7.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]
