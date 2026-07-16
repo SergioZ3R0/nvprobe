@@ -15,9 +15,9 @@ import argparse
 import time
 from typing import Any
 
-import cupy as cp
+from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json, require_cupy
 
-from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json
+cp = require_cupy()
 
 
 def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:

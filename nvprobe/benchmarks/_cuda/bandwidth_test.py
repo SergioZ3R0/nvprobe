@@ -15,10 +15,11 @@ import json
 import time
 from typing import Any
 
-import cupy as cp
 import numpy as np
 
-from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json
+from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json, require_cupy
+
+cp = require_cupy()
 
 
 def run_bandwidth_test(
@@ -46,7 +47,7 @@ def run_bandwidth_test(
 
         # Warmup
         for _ in range(min(10, iterations)):
-            cp.copyto(device_data, host_data)
+            device_data.set(host_data)
             cp.cuda.Stream.null.synchronize()
 
         # Host → Device
@@ -54,7 +55,7 @@ def run_bandwidth_test(
         end = cp.cuda.Event()
         start.record()
         for _ in range(iterations):
-            cp.copyto(device_data, host_data)
+            device_data.set(host_data)
         end.record()
         end.synchronize()
         h2d_ms = cp.cuda.get_elapsed_time(start, end)
@@ -64,7 +65,7 @@ def run_bandwidth_test(
         # Device → Host
         start.record()
         for _ in range(iterations):
-            cp.copyto(host_data, device_data)
+            host_data[:] = device_data.get()
         end.record()
         end.synchronize()
         d2h_ms = cp.cuda.get_elapsed_time(start, end)

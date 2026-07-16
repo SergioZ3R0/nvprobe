@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nvprobe"
-version = "0.5.2"
+version = "0.5.3"
 description = "NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison"
 readme = "README.md"
 license = "Apache-2.0"
@@ -31,7 +31,6 @@ dependencies = [
     "matplotlib>=3.7",
     "jinja2>=3.1",
     "rich>=13.0",
-    "cupy-cuda12x>=13.0",
 ]
 
 [project.urls]
@@ -44,6 +43,9 @@ nvprobe = "nvprobe.cli:app"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "ruff>=0.4"]
+cupy-cuda11x = ["cupy-cuda11x>=12.0"]
+cupy-cuda12x = ["cupy-cuda12x>=13.0"]
+cupy-cuda13x = ["cupy-cuda13x>=13.0"]
 
 [tool.setuptools.packages.find]
 include = ["nvprobe*"]

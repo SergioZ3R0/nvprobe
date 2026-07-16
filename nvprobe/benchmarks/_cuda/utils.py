@@ -7,6 +7,24 @@ import sys
 from typing import Any
 
 
+def require_cupy():
+    """Import cupy or exit with installation instructions."""
+    try:
+        import cupy as cp
+        return cp
+    except ImportError:
+        print(
+            "Error: CuPy is not installed.\n"
+            "Install the correct version for your CUDA toolkit:\n"
+            "  CUDA 13.x: pip install cupy-cuda13x\n"
+            "  CUDA 12.x: pip install cupy-cuda12x\n"
+            "  CUDA 11.x: pip install cupy-cuda11x\n"
+            "Or run: make install-cupy",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def output_json(data: dict[str, Any]) -> None:
     """Print result as JSON to stdout and exit."""
     print(json.dumps(data, default=str))
@@ -16,7 +34,7 @@ def output_json(data: dict[str, Any]) -> None:
 def get_gpu_info(gpu_index: int) -> dict[str, Any]:
     """Get GPU name and memory via cupy."""
     try:
-        import cupy as cp
+        cp = require_cupy()
         cp.cuda.Device(gpu_index).use()
         mem = cp.cuda.Device(gpu_index).mem_info
         props = cp.cuda.runtime.getDeviceProperties(gpu_index)
