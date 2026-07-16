@@ -62,6 +62,9 @@ benchmarks:
   - name: mlperf
     enabled: false    # run 'nvprobe setup-tools' to install
     params:
-      scenario: inference
-      mode: performance
-      dataset: openimages
+      scenario: Offline
+      model: resnet50
+      framework: onnxruntime
+      category: edge
+      implementation: reference
+      test_query_count: 100

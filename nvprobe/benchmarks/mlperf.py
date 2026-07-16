@@ -12,13 +12,13 @@ from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult, subprocess_e
 
 
 def _find_mlperf_cmd() -> str | None:
-    """Find cr or cmx command (from cmx4mlperf)."""
-    for name in ["cr", "cmx"]:
+    """Find mlcr, cr, or cmx command (from cmx4mlperf)."""
+    for name in ["mlcr", "cr", "cmx"]:
         path = shutil.which(name)
         if path:
             return path
     local_bin = os.path.expanduser("~/.local/bin")
-    for name in ["cr", "cmx"]:
+    for name in ["mlcr", "cr", "cmx"]:
         path = os.path.join(local_bin, name)
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
@@ -63,11 +63,25 @@ class MlperfBenchmark(BaseBenchmark):
 
         _ensure_mlperf_deps()
 
-        cmd_name = "cr" if os.path.basename(mlperf_cmd) == "cr" else "cmx"
+        cmd_name = os.path.basename(mlperf_cmd)
 
         if cmd_name == "cr":
             cmd = [
-                mlperf_cmd, "run-mlperf,inference,_find-performance,_full",
+                mlperf_cmd, "run-mlperf,inference",
+                f"--model={model}",
+                f"--implementation={implementation}",
+                f"--framework={framework}",
+                f"--category={category}",
+                f"--scenario={scenario}",
+                "--execution_mode=test",
+                "--device=cuda",
+                f"--test_query_count={test_query_count}",
+                "--quiet",
+            ]
+        elif cmd_name == "cmx":
+            cmd = [
+                mlperf_cmd, "run", "script",
+                "run-mlperf,inference",
                 f"--model={model}",
                 f"--implementation={implementation}",
                 f"--framework={framework}",
@@ -80,8 +94,8 @@ class MlperfBenchmark(BaseBenchmark):
             ]
         else:
             cmd = [
-                mlperf_cmd, "run", "script",
-                "run-mlperf,inference,_find-performance,_full",
+                mlperf_cmd, "run",
+                "app,mlperf,inference,generic",
                 f"--model={model}",
                 f"--implementation={implementation}",
                 f"--framework={framework}",
@@ -148,7 +162,7 @@ class MlperfBenchmark(BaseBenchmark):
 
 pip install --user loguru 2>/dev/null || true
 
-cr run-mlperf,inference,_find-performance,_full \\
+cr run-mlperf,inference \\
     --model={model} \\
     --implementation={implementation} \\
     --framework={framework} \\
