@@ -29,6 +29,7 @@ class HpcgBenchmark(BaseBenchmark):
     """Wrapper around NVIDIA HPCG benchmark (xhpcg) — requires MPI."""
 
     name = "hpcg"
+    uses_precision_batch = False
 
     def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
         binary = self.params.get("binary", "xhpcg")
@@ -44,41 +45,49 @@ class HpcgBenchmark(BaseBenchmark):
 
         mpi_run = _find_mpi_run()
         env = _build_env(gpu_index)
+        last_result = None
 
-        try:
-            if mpi_run:
-                cmd = [mpi_run, "--allow-run-as-root", "-np", "1", binary,
-                       "--grid", str(grid_sizes[0])]
-            else:
-                cmd = [binary, "--grid", str(grid_sizes[0])]
+        for size in grid_sizes:
+            try:
+                if mpi_run:
+                    cmd = [mpi_run, "-np", "1", binary, "--grid", str(size)]
+                else:
+                    cmd = [binary, "--grid", str(size)]
 
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=3600, check=True,
-                env=env,
-            )
-            gflops = _parse_hpcg_output(proc.stdout)
-            return BenchmarkResult(
-                benchmark=self.name,
-                gpu_model="unknown",
-                gpu_index=gpu_index,
-                precision=precision,
-                batch_size=batch_size,
-                metrics={"gflops": gflops, "grid_size": grid_sizes[0]},
-                raw_output=proc.stdout,
-            )
-        except FileNotFoundError:
-            return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
-                success=False,
-                error="MPI not found. Install OpenMPI or MPICH: apt install libopenmpi-dev / yum install openmpi-devel",
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
-                success=False, error=str(exc),
-            )
+                proc = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=3600, check=True,
+                    env=env,
+                )
+                gflops = _parse_hpcg_output(proc.stdout)
+                last_result = BenchmarkResult(
+                    benchmark=self.name,
+                    gpu_model="unknown",
+                    gpu_index=gpu_index,
+                    precision=precision,
+                    batch_size=batch_size,
+                    metrics={"gflops": gflops, "grid_size": size},
+                    raw_output=proc.stdout,
+                )
+            except FileNotFoundError:
+                return BenchmarkResult(
+                    benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                    precision=precision, batch_size=batch_size,
+                    success=False,
+                    error="MPI not found. Install OpenMPI or MPICH: apt install libopenmpi-dev / yum install openmpi-devel",
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                last_result = BenchmarkResult(
+                    benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                    precision=precision, batch_size=batch_size,
+                    success=False, error=str(exc),
+                )
+                break
+
+        return last_result or BenchmarkResult(
+            benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+            precision=precision, batch_size=batch_size,
+            success=False, error="No grid sizes configured",
+        )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
         """Return shell commands for this benchmark (without SBATCH headers)."""

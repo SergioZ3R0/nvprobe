@@ -110,6 +110,7 @@ class BaseBenchmark(ABC):
     """Abstract base for all benchmark implementations."""
 
     name: str = "base"
+    uses_precision_batch: bool = True  # False for HPC benchmarks that ignore these
 
     def __init__(self, params: dict[str, Any]) -> None:
         self.params = params

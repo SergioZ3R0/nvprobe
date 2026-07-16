@@ -52,24 +52,38 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
             benchmark = bench_cls(bench_cfg.params)
             print(f"Running: {bench_cfg.name}")
 
-            for precision in config.precisions:
-                for batch_size in config.batch_sizes:
-                    for gpu in gpus:
-                        gpu_index = gpu["index"]
+            if not benchmark.uses_precision_batch:
+                for gpu in gpus:
+                    gpu_index = gpu["index"]
+                    if dry_run:
+                        print(f"  [dry-run] {bench_cfg.name} gpu={gpu_index}")
+                        continue
+                    print(f"  {bench_cfg.name} gpu={gpu_index} ... ", end="", flush=True)
+                    t0 = time.monotonic()
+                    result = benchmark.run_local(gpu_index, "fp32", 1)
+                    elapsed = time.monotonic() - t0
+                    status = "OK" if result.success else f"FAIL: {result.error}"
+                    print(f"{status} ({elapsed:.1f}s)")
+                    db.insert_result(run_id, result, elapsed)
+            else:
+                for precision in config.precisions:
+                    for batch_size in config.batch_sizes:
+                        for gpu in gpus:
+                            gpu_index = gpu["index"]
 
-                        if dry_run:
-                            print(f"  [dry-run] {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size}")
-                            continue
+                            if dry_run:
+                                print(f"  [dry-run] {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size}")
+                                continue
 
-                        print(f"  {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size} ... ", end="", flush=True)
-                        t0 = time.monotonic()
-                        result = benchmark.run_local(gpu_index, precision, batch_size)
-                        elapsed = time.monotonic() - t0
+                            print(f"  {bench_cfg.name} gpu={gpu_index} prec={precision} bs={batch_size} ... ", end="", flush=True)
+                            t0 = time.monotonic()
+                            result = benchmark.run_local(gpu_index, precision, batch_size)
+                            elapsed = time.monotonic() - t0
 
-                        status = "OK" if result.success else f"FAIL: {result.error}"
-                        print(f"{status} ({elapsed:.1f}s)")
+                            status = "OK" if result.success else f"FAIL: {result.error}"
+                            print(f"{status} ({elapsed:.1f}s)")
 
-                        db.insert_result(run_id, result, elapsed)
+                            db.insert_result(run_id, result, elapsed)
     finally:
         db.close()
         print(f"\nResults saved to {output_dir}")
