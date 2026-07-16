@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/nvprobe.svg" alt="nvProbe logo" width="200">
+  <img src="reports/nvprobe.svg" alt="nvProbe logo" width="200">
 </p>
 
 # nvProbe: NVIDIA GPU & CUDA Benchmark Suite
