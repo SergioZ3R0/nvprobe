@@ -3,7 +3,7 @@
 .PHONY: install dev test lint run report clean install-cupy setup
 
 install:
-	pip install -e .
+	pip install --user -e .
 
 setup: install install-cupy
 	@echo "nvProbe ready."
@@ -21,20 +21,20 @@ install-cupy:
 	echo "Detected CUDA $$CUDA_VERSION (major: $$CUDA_MAJOR)"; \
 	if [ "$$CUDA_MAJOR" -ge 13 ]; then \
 		echo "Installing cupy-cuda13x[ctk] (includes cuBLAS, cuFFT, cuRAND, cuSOLVER, cuSPARSE)..."; \
-		pip install "cupy-cuda13x[ctk]>=13.0"; \
+		pip install --user "cupy-cuda13x[ctk]>=13.0"; \
 	elif [ "$$CUDA_MAJOR" -ge 12 ]; then \
 		echo "Installing cupy-cuda12x[ctk] (includes cuBLAS, cuFFT, cuRAND, cuSOLVER, cuSPARSE)..."; \
-		pip install "cupy-cuda12x[ctk]>=13.0"; \
+		pip install --user "cupy-cuda12x[ctk]>=13.0"; \
 	elif [ "$$CUDA_MAJOR" -ge 11 ]; then \
 		echo "Installing cupy-cuda11x[ctk] (includes cuBLAS, cuFFT, cuRAND, cuSOLVER, cuSPARSE)..."; \
-		pip install "cupy-cuda11x[ctk]>=12.0"; \
+		pip install --user "cupy-cuda11x[ctk]>=12.0"; \
 	else \
 		echo "Error: CUDA $$CUDA_VERSION is too old. Requires CUDA 11.0+"; \
 		exit 1; \
 	fi
 
 dev:
-	pip install -e ".[dev]"
+	pip install --user -e ".[dev]"
 
 test:
 	python -m pytest tests/ -v
