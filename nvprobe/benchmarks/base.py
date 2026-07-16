@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import os
+import shutil
 import site
 import sys
 from abc import ABC, abstractmethod
@@ -45,25 +46,28 @@ def _find_system_cuda_libs() -> list[str]:
         "/usr/local/cuda/lib64",
         "/usr/local/cuda/compat",
     ]
-    # Check CUDA_PATH/CUDA_HOME env vars (common on HPC)
+    # Check CUDA_PATH/CUDA_HOME/CUDA_ROOT env vars (common on HPC)
     for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
         cuda_path = os.environ.get(env_var)
         if cuda_path:
             candidates.insert(0, os.path.join(cuda_path, "lib64"))
             candidates.insert(0, os.path.join(cuda_path, "compat"))
-    nvidia_smi = os.popen("which nvidia-smi 2>/dev/null").read().strip()
+    # Find nvcc via shutil.which and derive toolkit lib path
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        toolkit_base = str(Path(nvcc).parent.parent)
+        for sub in ("lib64", "lib", "compat"):
+            p = os.path.join(toolkit_base, sub)
+            if p not in candidates:
+                candidates.insert(0, p)
+    # Find nvidia-smi and check nearby lib dirs
+    nvidia_smi = shutil.which("nvidia-smi")
     if nvidia_smi:
         nvidia_dir = str(Path(nvidia_smi).parent)
-        candidates.insert(0, nvidia_dir)
-        candidates.insert(0, os.path.join(nvidia_dir, "..", "compat"))
-        candidates.insert(0, os.path.join(nvidia_dir, "..", "lib64"))
-    # Check nvcc parent path (CUDA toolkit on HPC clusters)
-    nvcc = os.popen("which nvcc 2>/dev/null").read().strip()
-    if nvcc:
-        nvcc_lib64 = str(Path(nvcc).parent.parent / "lib64")
-        nvcc_compat = str(Path(nvcc).parent.parent / "compat")
-        candidates.insert(0, nvcc_lib64)
-        candidates.insert(0, nvcc_compat)
+        for sub in ("", "../lib64", "../lib", "../compat"):
+            p = os.path.normpath(os.path.join(nvidia_dir, sub))
+            if p not in candidates:
+                candidates.insert(0, p)
 
     found: list[str] = []
     for path in candidates:
@@ -114,11 +118,11 @@ def subprocess_env() -> dict[str, str]:
 
     # Also add MPI lib paths (for HPL/HPCG binaries compiled against MPI)
     for mpi_name in ["mpirun", "srun"]:
-        mpi_bin = os.popen(f"which {mpi_name} 2>/dev/null").read().strip()
+        mpi_bin = shutil.which(mpi_name)
         if mpi_bin:
-            mpi_lib = str(Path(mpi_bin).parent.parent / "lib")
-            mpi_lib64 = str(Path(mpi_bin).parent.parent / "lib64")
-            for ml in (mpi_lib, mpi_lib64):
+            mpi_base = str(Path(mpi_bin).parent.parent)
+            for sub in ("lib", "lib64"):
+                ml = os.path.join(mpi_base, sub)
                 if os.path.isdir(ml) and ml not in cuda_libs:
                     cuda_libs.append(ml)
 
