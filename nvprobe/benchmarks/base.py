@@ -70,9 +70,12 @@ def _find_system_cuda_libs() -> list[str]:
         p = os.path.realpath(path)
         if not os.path.isdir(p):
             continue
-        # Accept dir if it has driver lib OR runtime/BLAS libs
-        marker_libs = ("libcuda.so.1", "libcudart.so.1", "libcublas.so.1", "libcudnn.so.1")
-        if any(os.path.exists(os.path.join(p, m)) for m in marker_libs):
+        try:
+            files = os.listdir(p)
+        except OSError:
+            continue
+        prefixes = ("libcuda.so", "libcudart.so", "libcublas.so", "libcudnn.so")
+        if any(any(f.startswith(prefix) for f in files) for prefix in prefixes):
             found.append(p)
     return found
 
@@ -108,6 +111,16 @@ def subprocess_env() -> dict[str, str]:
     cuda_libs: list[str] = []
     cuda_libs.extend(_find_cupy_cuda_libs())
     cuda_libs.extend(_find_system_cuda_libs())
+
+    # Also add MPI lib paths (for HPL/HPCG binaries compiled against MPI)
+    for mpi_name in ["mpirun", "srun"]:
+        mpi_bin = os.popen(f"which {mpi_name} 2>/dev/null").read().strip()
+        if mpi_bin:
+            mpi_lib = str(Path(mpi_bin).parent.parent / "lib")
+            mpi_lib64 = str(Path(mpi_bin).parent.parent / "lib64")
+            for ml in (mpi_lib, mpi_lib64):
+                if os.path.isdir(ml) and ml not in cuda_libs:
+                    cuda_libs.append(ml)
 
     if cuda_libs:
         existing = env.get("LD_LIBRARY_PATH", "")

@@ -1,3 +1,3 @@
 """nvProbe — NVIDIA GPU benchmark suite for CUDA workload automation."""
 
-__version__ = "0.5.26"
+__version__ = "0.5.27"
