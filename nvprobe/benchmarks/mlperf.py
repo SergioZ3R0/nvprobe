@@ -137,16 +137,31 @@ class MlperfBenchmark(BaseBenchmark):
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             stderr = getattr(exc, "stderr", "") or ""
-            error_msg = f"{exc}\n{stderr}".strip()
-            if "Permission denied" in error_msg:
-                error_msg += (
-                    "\n\nFix: pip install --user loguru"
-                    "\nThen re-run: nvprobe run --config <your-config> --local"
+            # Extract only the meaningful error lines, skip verbose mlcr logs
+            error_lines = []
+            for line in stderr.splitlines():
+                line_stripped = line.strip()
+                if any(kw in line_stripped.lower() for kw in (
+                    "error", "failed", "permission denied", "cudnn",
+                    "not found", "exception", "traceback",
+                )):
+                    error_lines.append(line_stripped)
+            detail = "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
+
+            if "cudnn" in detail.lower() or "cudnn" in stderr.lower():
+                detail = (
+                    "cuDNN not found. Install cuDNN locally:\n"
+                    "  1. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
+                    "  2. mlcr get,nvidia,cudnn --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
+                    "  Or set CUDNN_ROOT to an existing cuDNN installation."
                 )
+            elif "Permission denied" in detail:
+                detail += "\n\nFix: pip install --user loguru"
+
             return BenchmarkResult(
                 benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
-                success=False, error=error_msg,
+                success=False, error=detail or f"{exc}",
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:

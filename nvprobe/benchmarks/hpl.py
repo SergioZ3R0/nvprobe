@@ -25,6 +25,46 @@ def _build_env(gpu_index: int) -> dict[str, str]:
     return env
 
 
+def _run_hpl_size(
+    binary: str, size: int, mpi_run: str | None,
+    env: dict[str, str], gpu_index: int, precision: str, batch_size: int,
+) -> BenchmarkResult | None:
+    """Run HPL for a single problem size. Returns None if binary not found."""
+    try:
+        if mpi_run:
+            cmd = [mpi_run, "-np", "1", binary, "--problem-size", str(size)]
+        else:
+            cmd = [binary, "--problem-size", str(size)]
+
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=3600, check=True,
+            env=env,
+        )
+        gflops = _parse_hpl_output(proc.stdout)
+        return BenchmarkResult(
+            benchmark="hpl", gpu_model="unknown", gpu_index=gpu_index,
+            precision=precision, batch_size=batch_size,
+            metrics={"gflops": gflops, "problem_size": size},
+            raw_output=proc.stdout,
+        )
+    except FileNotFoundError:
+        return BenchmarkResult(
+            benchmark="hpl", gpu_model="unknown", gpu_index=gpu_index,
+            precision=precision, batch_size=batch_size,
+            success=False,
+            error="MPI binary not found. Install OpenMPI or MPICH.",
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        stderr = getattr(exc, "stderr", "") or ""
+        stdout = getattr(exc, "stdout", "") or ""
+        detail = stderr.strip()[-500:] if stderr else stdout.strip()[-500:]
+        return BenchmarkResult(
+            benchmark="hpl", gpu_model="unknown", gpu_index=gpu_index,
+            precision=precision, batch_size=batch_size,
+            success=False, error=f"{exc}\n{detail}".strip(),
+        )
+
+
 class HplBenchmark(BaseBenchmark):
     """Wrapper around NVIDIA HPL benchmark (xhpl) — requires MPI."""
 
@@ -48,42 +88,23 @@ class HplBenchmark(BaseBenchmark):
         last_result = None
 
         for size in problem_sizes:
-            try:
-                if mpi_run:
-                    cmd = [mpi_run, "-np", "1", binary, "--problem-size", str(size)]
+            result = _run_hpl_size(binary, size, mpi_run, env, gpu_index, precision, batch_size)
+            if result is None or result.success:
+                last_result = result or last_result
+                if result and not result.success:
+                    break
+                continue
+            # If MPI failed, retry without MPI
+            if mpi_run and "opal_pmix" in result.error or "orte" in result.error:
+                result2 = _run_hpl_size(binary, size, None, env, gpu_index, precision, batch_size)
+                if result2:
+                    last_result = result2
+                    if not result2.success:
+                        break
                 else:
-                    cmd = [binary, "--problem-size", str(size)]
-
-                proc = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=3600, check=True,
-                    env=env,
-                )
-                gflops = _parse_hpl_output(proc.stdout)
-                last_result = BenchmarkResult(
-                    benchmark=self.name,
-                    gpu_model="unknown",
-                    gpu_index=gpu_index,
-                    precision=precision,
-                    batch_size=batch_size,
-                    metrics={"gflops": gflops, "problem_size": size},
-                    raw_output=proc.stdout,
-                )
-            except FileNotFoundError:
-                return BenchmarkResult(
-                    benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
-                    precision=precision, batch_size=batch_size,
-                    success=False,
-                    error="MPI not found. Install OpenMPI or MPICH: apt install libopenmpi-dev / yum install openmpi-devel",
-                )
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-                stderr = getattr(exc, "stderr", "") or ""
-                stdout = getattr(exc, "stdout", "") or ""
-                detail = stderr.strip()[-500:] if stderr else stdout.strip()[-500:]
-                last_result = BenchmarkResult(
-                    benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
-                    precision=precision, batch_size=batch_size,
-                    success=False, error=f"{exc}\n{detail}".strip(),
-                )
+                    last_result = result
+            else:
+                last_result = result
                 break
 
         return last_result or BenchmarkResult(
