@@ -147,52 +147,70 @@ def _do_setup_tools(force: bool = False) -> None:
     )
 
     benchmarks = {
-        "HPL":  (f"hpl-linux-{arch}/xhpl", "xhpl"),
-        "HPCG": (f"hpcg-linux-{arch}/xhpcg", "xhpcg"),
+        "HPL":  (f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/cuda12/hpl-linux-{arch}/xhpl", "xhpl"),
+        "HPCG": (f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/cuda12/hpcg-linux-{arch}/xhpcg", "xhpcg"),
     }
 
     for label, (internal_path, final_name) in benchmarks.items():
         target = tools_dir / final_name
         if target.exists() and not force:
             console.print(f"[dim]{label} already installed: {target}[/dim]")
-            continue
 
-        console.print(f"[bold]Installing {label}...[/bold]")
-        tarball_url = f"{base_url}/{tarball_name}"
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                tarball_path = Path(tmp) / tarball_name
-                console.print(f"  Downloading {tarball_name} (~290 MB)...")
-                urllib.request.urlretrieve(tarball_url, tarball_path)
+    # Check if we need to download anything
+    needed = {
+        label: (internal_path, final_name)
+        for label, (internal_path, final_name) in benchmarks.items()
+        if not (tools_dir / final_name).exists() or force
+    }
+    if not needed:
+        return
 
-                console.print("  Extracting...")
-                with tarfile.open(tarball_path, "r:xz") as tar:
-                    member = tar.getmember(internal_path)
-                    member.name = final_name
-                    tar.extract(member, path=str(tools_dir))
+    console.print("[bold]Downloading NVIDIA HPC Benchmarks...[/bold]")
+    tarball_url = f"{base_url}/{tarball_name}"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tarball_path = Path(tmp) / tarball_name
+            console.print(f"  {tarball_name} (~300 MB)...")
+            urllib.request.urlretrieve(tarball_url, tarball_path)
 
-                (tools_dir / final_name).chmod(0o755)
-                console.print(f"  [green]{tools_dir / final_name}[/green]")
-        except KeyError:
-            console.print(f"  [yellow]{label} binary not found in tarball ({internal_path})[/yellow]")
-        except Exception as exc:
-            console.print(f"  [yellow]{label} download failed: {exc}[/yellow]")
-            if "404" in str(exc) or "HTTP Error" in str(exc):
-                console.print(f"  [dim]Check: {tarball_url}[/dim]")
+            console.print("  Extracting...")
+            with tarfile.open(tarball_path, "r:xz") as tar:
+                for label, (internal_path, final_name) in needed.items():
+                    try:
+                        member = tar.getmember(internal_path)
+                        member.name = final_name
+                        tar.extract(member, path=str(tools_dir))
+                        (tools_dir / final_name).chmod(0o755)
+                        console.print(f"  [green]{label}: {tools_dir / final_name}[/green]")
+                    except KeyError:
+                        console.print(f"  [yellow]{label} binary not found in tarball ({internal_path})[/yellow]")
+    except Exception as exc:
+        console.print(f"  [yellow]Download failed: {exc}[/yellow]")
+        if "404" in str(exc) or "HTTP Error" in str(exc):
+            console.print(f"  [dim]Check: {tarball_url}[/dim]")
 
     try:
         import mlperf_inference  # noqa: F401
         console.print("[dim]MLPerf already installed[/dim]")
     except ImportError:
         console.print("[bold]Installing MLPerf Inference...[/bold]")
+        # Find a Python with pip access (sys.executable may be a restricted shared Python)
+        python_cmd = sys.executable
+        for candidate in ["python3", "python3.11", "python3.10"]:
+            import shutil as _shutil
+            path = _shutil.which(candidate)
+            if path and path != sys.executable:
+                python_cmd = path
+                break
         try:
             subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--user", "mlperf-inference"],
+                [python_cmd, "-m", "pip", "install", "--user", "mlperf-inference"],
                 check=True, capture_output=True,
             )
             console.print("  [green]mlperf-inference installed[/green]")
         except Exception as exc:
             console.print(f"  [yellow]MLPerf install failed: {exc}[/yellow]")
+            console.print("  [dim]Try manually: pip install --user mlperf-inference[/dim]")
 
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")

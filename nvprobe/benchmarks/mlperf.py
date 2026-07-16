@@ -19,6 +19,19 @@ class MlperfBenchmark(BaseBenchmark):
         mode = self.params.get("mode", "performance")
         dataset = self.params.get("dataset", "openimages")
 
+        # Check if mlperf is available before running
+        try:
+            import mlperf_inference  # noqa: F401
+        except ImportError:
+            return BenchmarkResult(
+                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                precision=precision, batch_size=batch_size,
+                success=False, error=(
+                    "mlperf-inference not installed. "
+                    "Run 'pip install --user mlperf-inference' to enable."
+                ),
+            )
+
         cmd = [
             sys.executable, "-m", "mlperf_" + scenario,
             "--gpu", str(gpu_index),
