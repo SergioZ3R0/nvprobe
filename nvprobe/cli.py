@@ -98,12 +98,13 @@ def version() -> None:
     console.print(f"nvprobe {__version__}")
 
 
-@app.command()
-def init(
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing configs."),
-) -> None:
+# ---------------------------------------------------------------------------
+# Core logic (called by both standalone commands and `setup`)
+# ---------------------------------------------------------------------------
+
+def _do_init(force: bool = False) -> None:
     """Generate default config files in the current directory."""
-    import shutil
+    import shutil as _shutil
 
     configs_dir = Path(__file__).parent / "configs"
     dest = Path("configs")
@@ -118,7 +119,7 @@ def init(
         if dst.exists() and not force:
             console.print(f"  [dim]skip {dst.name}[/dim]")
         else:
-            shutil.copy2(src, dst)
+            _shutil.copy2(src, dst)
             console.print(f"  [green]{dst}[/green]")
 
     console.print(f"\n[green]Configs written to {dest}/[/green]")
@@ -126,10 +127,7 @@ def init(
     console.print("  nvprobe run --config configs/local.yaml --local")
 
 
-@app.command()
-def setup_tools(
-    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already installed."),
-) -> None:
+def _do_setup_tools(force: bool = False) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     import platform
     import subprocess
@@ -141,14 +139,13 @@ def setup_tools(
     tools_dir.mkdir(parents=True, exist_ok=True)
 
     arch = "x86_64" if platform.machine() == "x86_64" else "aarch64"
-    nvidia_version = "26.02"
+    nvidia_version = "26.02.02"
     tarball_name = f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive.tar.xz"
     base_url = (
         "https://developer.download.nvidia.com/compute/nvidia-hpc-benchmarks"
         f"/redist/nvidia_hpc_benchmarks_mpich/linux-{arch}"
     )
 
-    # Map benchmark name -> (binary inside tarball, final name)
     benchmarks = {
         "HPL":  (f"hpl-linux-{arch}/xhpl", "xhpl"),
         "HPCG": (f"hpcg-linux-{arch}/xhpcg", "xhpcg"),
@@ -183,7 +180,6 @@ def setup_tools(
             if "404" in str(exc) or "HTTP Error" in str(exc):
                 console.print(f"  [dim]Check: {tarball_url}[/dim]")
 
-    # --- MLPerf ---
     try:
         import mlperf_inference  # noqa: F401
         console.print("[dim]MLPerf already installed[/dim]")
@@ -198,12 +194,99 @@ def setup_tools(
         except Exception as exc:
             console.print(f"  [yellow]MLPerf install failed: {exc}[/yellow]")
 
-    # --- Summary ---
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
     console.print("Add to your shell profile:")
     console.print(f'  export PATH="{path_add}:$PATH"')
     console.print("Or run benchmarks with 'binary' param pointing to the full path.")
+
+
+# ---------------------------------------------------------------------------
+# CLI commands
+# ---------------------------------------------------------------------------
+
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing configs."),
+) -> None:
+    """Generate default config files in the current directory."""
+    _do_init(force=force)
+
+
+@app.command()
+def setup_tools(
+    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already installed."),
+) -> None:
+    """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
+    _do_setup_tools(force=force)
+
+
+@app.command()
+def setup(
+    force: bool = typer.Option(False, "--force", "-f", help="Force reinstall."),
+) -> None:
+    """Full setup: install cupy[ctk], download HPL/HPCG, generate configs."""
+    import shutil
+    import subprocess
+
+    console.print(f"[bold green]nvprobe v{__version__} — full setup[/bold green]\n")
+
+    # --- Step 1: Detect CUDA and install cupy ---
+    console.print("[bold]Step 1: Detect CUDA[/bold]")
+    cuda_ver = None
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        try:
+            out = subprocess.run(
+                [nvcc, "--version"], capture_output=True, text=True, check=True,
+            )
+            for line in out.stdout.splitlines():
+                if "release" in line:
+                    cuda_ver = line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                    break
+        except Exception:
+            pass
+
+    if not cuda_ver:
+        try:
+            subprocess.run(
+                ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                capture_output=True, text=True, check=True,
+            )
+            console.print("  [yellow]nvcc not found (nvidia-smi present)[/yellow]")
+            console.print("  [dim]Install CUDA toolkit for automatic cupy detection[/dim]")
+        except Exception:
+            console.print("  [yellow]No CUDA detected. Skipping cupy install.[/yellow]")
+            console.print("  [dim]Install CUDA toolkit, then run: nvprobe setup-tools[/dim]")
+            return
+
+    if cuda_ver:
+        cuda_major = cuda_ver.split(".")[0]
+        py_ver = f"{sys.version_info.major}{sys.version_info.minor}"
+        cupy_pkg = f"cupy-cuda{cuda_major}x"
+        console.print(f"  CUDA: {cuda_ver} | Python: {py_ver} | Package: {cupy_pkg}")
+
+        try:
+            import cupy  # noqa: F401
+            console.print("  [dim]cupy already installed[/dim]")
+        except ImportError:
+            console.print(f"  Installing {cupy_pkg}[ctk]...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "--user", f"{cupy_pkg}[ctk]"],
+                    check=True,
+                )
+                console.print(f"  [green]{cupy_pkg}[ctk] installed[/green]")
+            except Exception as exc:
+                console.print(f"  [yellow]cupy install failed: {exc}[/yellow]")
+
+    # --- Step 2: Download HPL/HPCG/MLPerf ---
+    console.print("\n[bold]Step 2: Install HPL, HPCG, MLPerf[/bold]")
+    _do_setup_tools(force=force)
+
+    # --- Step 3: Generate configs ---
+    console.print("\n[bold]Step 3: Generate configs[/bold]")
+    _do_init(force=force)
 
 
 @app.command(name="slurm")
