@@ -45,19 +45,34 @@ def _find_system_cuda_libs() -> list[str]:
         "/usr/local/cuda/lib64",
         "/usr/local/cuda/compat",
     ]
+    # Check CUDA_PATH/CUDA_HOME env vars (common on HPC)
+    for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
+        cuda_path = os.environ.get(env_var)
+        if cuda_path:
+            candidates.insert(0, os.path.join(cuda_path, "lib64"))
+            candidates.insert(0, os.path.join(cuda_path, "compat"))
     nvidia_smi = os.popen("which nvidia-smi 2>/dev/null").read().strip()
     if nvidia_smi:
         nvidia_dir = str(Path(nvidia_smi).parent)
         candidates.insert(0, nvidia_dir)
         candidates.insert(0, os.path.join(nvidia_dir, "..", "compat"))
         candidates.insert(0, os.path.join(nvidia_dir, "..", "lib64"))
+    # Check nvcc parent path (CUDA toolkit on HPC clusters)
+    nvcc = os.popen("which nvcc 2>/dev/null").read().strip()
+    if nvcc:
+        nvcc_lib64 = str(Path(nvcc).parent.parent / "lib64")
+        nvcc_compat = str(Path(nvcc).parent.parent / "compat")
+        candidates.insert(0, nvcc_lib64)
+        candidates.insert(0, nvcc_compat)
 
     found: list[str] = []
     for path in candidates:
         p = os.path.realpath(path)
-        if os.path.isdir(p) and any(
-            os.path.exists(os.path.join(p, f"libcuda.so.{v}")) for v in ("1", "")
-        ):
+        if not os.path.isdir(p):
+            continue
+        # Accept dir if it has driver lib OR runtime/BLAS libs
+        marker_libs = ("libcuda.so.1", "libcudart.so.1", "libcublas.so.1", "libcudnn.so.1")
+        if any(os.path.exists(os.path.join(p, m)) for m in marker_libs):
             found.append(p)
     return found
 
@@ -74,6 +89,20 @@ def subprocess_env() -> dict[str, str]:
         if user_site not in parts:
             parts.insert(0, user_site)
         env["PYTHONPATH"] = os.pathsep.join(parts)
+
+    # Add user local bin and CUDA bin to PATH (for mlcr, nvcc, etc.)
+    user_local_bin = os.path.join(str(Path.home()), ".local", "bin")
+    path_parts = [p for p in env.get("PATH", "").split(os.pathsep) if p]
+    for extra in [user_local_bin]:
+        if extra not in path_parts:
+            path_parts.insert(0, extra)
+    for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
+        cuda_path = env.get(env_var)
+        if cuda_path:
+            cuda_bin = os.path.join(cuda_path, "bin")
+            if cuda_bin not in path_parts:
+                path_parts.insert(0, cuda_bin)
+    env["PATH"] = os.pathsep.join(path_parts)
 
     # Add CUDA library paths to LD_LIBRARY_PATH
     cuda_libs: list[str] = []

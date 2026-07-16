@@ -76,10 +76,13 @@ class HpcgBenchmark(BaseBenchmark):
                     error="MPI not found. Install OpenMPI or MPICH: apt install libopenmpi-dev / yum install openmpi-devel",
                 )
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                stderr = getattr(exc, "stderr", "") or ""
+                stdout = getattr(exc, "stdout", "") or ""
+                detail = stderr.strip()[-500:] if stderr else stdout.strip()[-500:]
                 last_result = BenchmarkResult(
                     benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
                     precision=precision, batch_size=batch_size,
-                    success=False, error=str(exc),
+                    success=False, error=f"{exc}\n{detail}".strip(),
                 )
                 break
 
