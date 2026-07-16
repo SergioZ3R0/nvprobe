@@ -218,16 +218,16 @@ def generate_report(
         "gpu_comparison": _chart_gpu_comparison(results),
     }
 
-    html = _render_html(report_title, latest_run, results, env_info, charts, logo_src.exists())
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Copy logo to reports directory
     logo_src = Path(__file__).parent / "nvprobe.svg"
     logo_dst = output_dir / "nvprobe.svg"
     if logo_src.exists():
         import shutil
         shutil.copy2(logo_src, logo_dst)
+
+    html = _render_html(report_title, latest_run, results, env_info, charts, logo_src.exists())
+
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     report_path = output_dir / "report.html"
     report_path.write_text(html, encoding="utf-8")
