@@ -168,7 +168,33 @@ def _detect_cuda_major() -> str | None:
     return None
 
 
-def _do_setup_tools(force: bool = False, cuda_version: str | None = None) -> None:
+def _detect_mpi_variant() -> str:
+    """Detect MPI implementation: 'mpich' (or ABI-compatible) vs 'openmpi'.
+
+    Returns 'openmpi' if mpirun reports Open MPI, 'mpich' otherwise.
+    """
+    import os
+    import shutil
+    import subprocess
+    mpi_bin = shutil.which("mpirun")
+    if mpi_bin:
+        try:
+            out = subprocess.run(
+                [mpi_bin, "--version"], capture_output=True, text=True, timeout=5,
+            )
+            combined = (out.stdout + out.stderr).lower()
+            if "open mpi" in combined or "openmpi" in combined:
+                return "openmpi"
+        except Exception:
+            pass
+    # Also check common env vars for hints
+    opal = os.environ.get("OPAL_PREFIX", "")
+    if "openmpi" in opal.lower():
+        return "openmpi"
+    return "mpich"
+
+
+def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_variant: str | None = None) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     import os
     import platform
@@ -181,16 +207,19 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None) -> Non
     # Auto-detect CUDA version if not provided
     if cuda_version is None:
         cuda_version = _detect_cuda_major() or "12"
+    # Auto-detect MPI variant if not provided
+    if mpi_variant is None:
+        mpi_variant = _detect_mpi_variant()
 
     tools_dir = Path.home() / ".nvprobe" / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
 
     arch = "x86_64" if platform.machine() == "x86_64" else "aarch64"
     nvidia_version = "26.02.02"
-    tarball_name = f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive.tar.xz"
+    tarball_name = f"nvidia_hpc_benchmarks_{mpi_variant}-linux-{arch}-{nvidia_version}-archive.tar.xz"
     base_url = (
         "https://developer.download.nvidia.com/compute/nvidia-hpc-benchmarks"
-        f"/redist/nvidia_hpc_benchmarks_mpich/linux-{arch}"
+        f"/redist/nvidia_hpc_benchmarks_{mpi_variant}/linux-{arch}"
     )
 
     benchmarks = {
@@ -199,7 +228,8 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None) -> Non
     }
 
     def _build_internal_path(cuda_dir: str, template: str) -> str:
-        return f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/{cuda_dir}/{template.format(arch=arch)}"
+        prefix = f"nvidia_hpc_benchmarks_{mpi_variant}-linux-{arch}-{nvidia_version}-archive"
+        return f"{prefix}/{cuda_dir}/{template.format(arch=arch)}"
 
     for label, (internal_path, final_name) in benchmarks.items():
         target = tools_dir / final_name
