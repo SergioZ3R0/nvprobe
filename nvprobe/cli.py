@@ -277,10 +277,32 @@ def setup(
         cupy_pkg = f"cupy-cuda{cuda_major}x"
         console.print(f"  CUDA: {cuda_ver} | Python: {py_ver} | Package: {cupy_pkg}")
 
+        # Check if installed cupy matches current CUDA version
+        cupy_ok = False
         try:
-            import cupy  # noqa: F401
-            console.print("  [dim]cupy already installed[/dim]")
-        except ImportError:
+            import importlib.metadata
+            for dist in importlib.metadata.distributions():
+                if dist.metadata["Name"].startswith("cupy-cuda"):
+                    installed_ver = dist.metadata["Name"]
+                    console.print(f"  Installed: {installed_ver}")
+                    if installed_ver == cupy_pkg:
+                        cupy_ok = True
+                    else:
+                        console.print(f"  [yellow]CUDA version mismatch! {installed_ver} vs needed {cupy_pkg}[/yellow]")
+                    break
+        except Exception:
+            pass
+
+        if not cupy_ok:
+            try:
+                import cupy  # noqa: F401
+                cupy_ok = True
+            except ImportError:
+                pass
+
+        if cupy_ok:
+            console.print("  [dim]cupy OK[/dim]")
+        else:
             console.print(f"  Installing {cupy_pkg}[ctk]...")
             try:
                 subprocess.run(
