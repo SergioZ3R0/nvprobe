@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/nvprobe.svg" alt="nvProbe logo" width="200">
+</p>
+
 # nvProbe: NVIDIA GPU & CUDA Benchmark Suite
 
 NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison.
