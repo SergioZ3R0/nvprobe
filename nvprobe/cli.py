@@ -132,44 +132,56 @@ def setup_tools(
 ) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     import platform
-    import shutil
     import subprocess
+    import tarfile
+    import tempfile
     import urllib.request
 
     tools_dir = Path.home() / ".nvprobe" / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
 
     arch = "x86_64" if platform.machine() == "x86_64" else "aarch64"
+    nvidia_version = "26.02"
+    tarball_name = f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive.tar.xz"
+    base_url = (
+        "https://developer.download.nvidia.com/compute/nvidia-hpc-benchmarks"
+        f"/redist/nvidia_hpc_benchmarks_mpich/linux-{arch}"
+    )
 
-    # --- HPL ---
-    hpl_bin = tools_dir / "xhpl"
-    if hpl_bin.exists() and not force:
-        console.print(f"[dim]HPL already installed: {hpl_bin}[/dim]")
-    else:
-        console.print("[bold]Installing HPL...[/bold]")
-        try:
-            url = f"https://github.com/SergioZ3R0/nvprobe-tools/releases/latest/download/xhpl-{arch}"
-            urllib.request.urlretrieve(url, hpl_bin)
-            hpl_bin.chmod(0o755)
-            console.print(f"  [green]{hpl_bin}[/green]")
-        except Exception as exc:
-            console.print(f"  [yellow]HPL download failed: {exc}[/yellow]")
-            console.print("  [dim]Build from source: https://www.netlib.org/benchmark/hpl/[/dim]")
+    # Map benchmark name -> (binary inside tarball, final name)
+    benchmarks = {
+        "HPL":  (f"hpl-linux-{arch}/xhpl", "xhpl"),
+        "HPCG": (f"hpcg-linux-{arch}/xhpcg", "xhpcg"),
+    }
 
-    # --- HPCG ---
-    hpcg_bin = tools_dir / "xhpcg"
-    if hpcg_bin.exists() and not force:
-        console.print(f"[dim]HPCG already installed: {hpcg_bin}[/dim]")
-    else:
-        console.print("[bold]Installing HPCG...[/bold]")
+    for label, (internal_path, final_name) in benchmarks.items():
+        target = tools_dir / final_name
+        if target.exists() and not force:
+            console.print(f"[dim]{label} already installed: {target}[/dim]")
+            continue
+
+        console.print(f"[bold]Installing {label}...[/bold]")
+        tarball_url = f"{base_url}/{tarball_name}"
         try:
-            url = f"https://github.com/SergioZ3R0/nvprobe-tools/releases/latest/download/xhpcg-{arch}"
-            urllib.request.urlretrieve(url, hpcg_bin)
-            hpcg_bin.chmod(0o755)
-            console.print(f"  [green]{hpcg_bin}[/green]")
+            with tempfile.TemporaryDirectory() as tmp:
+                tarball_path = Path(tmp) / tarball_name
+                console.print(f"  Downloading {tarball_name} (~290 MB)...")
+                urllib.request.urlretrieve(tarball_url, tarball_path)
+
+                console.print("  Extracting...")
+                with tarfile.open(tarball_path, "r:xz") as tar:
+                    member = tar.getmember(internal_path)
+                    member.name = final_name
+                    tar.extract(member, path=str(tools_dir))
+
+                (tools_dir / final_name).chmod(0o755)
+                console.print(f"  [green]{tools_dir / final_name}[/green]")
+        except KeyError:
+            console.print(f"  [yellow]{label} binary not found in tarball ({internal_path})[/yellow]")
         except Exception as exc:
-            console.print(f"  [yellow]HPCG download failed: {exc}[/yellow]")
-            console.print("  [dim]Build from source: https://github.com/hpcg-benchmark/hpcg[/dim]")
+            console.print(f"  [yellow]{label} download failed: {exc}[/yellow]")
+            if "404" in str(exc) or "HTTP Error" in str(exc):
+                console.print(f"  [dim]Check: {tarball_url}[/dim]")
 
     # --- MLPerf ---
     try:
@@ -186,12 +198,15 @@ def setup_tools(
         except Exception as exc:
             console.print(f"  [yellow]MLPerf install failed: {exc}[/yellow]")
 
-    # --- Update PATH ---
+    # --- Summary ---
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
     console.print("Add to your shell profile:")
     console.print(f'  export PATH="{path_add}:$PATH"')
     console.print("Or run benchmarks with 'binary' param pointing to the full path.")
+
+
+@app.command(name="slurm")
 def slurm_cmd(
     config: Path = typer.Option(
         ..., "--config", "-c", help="YAML config file.",
