@@ -198,12 +198,22 @@ def _do_setup_tools(force: bool = False) -> None:
         if "404" in str(exc) or "HTTP Error" in str(exc):
             console.print(f"  [dim]Check: {tarball_url}[/dim]")
 
-    try:
-        import mlperf_inference  # noqa: F401
-        console.print("[dim]MLPerf already installed[/dim]")
-    except ImportError:
-        console.print("[dim]MLPerf not installed (optional)[/dim]")
-        console.print("  [dim]To enable: pip install cmx4mlperf[/dim]")
+    mlperf_cmd = shutil.which("cr") or shutil.which("cmx")
+    if mlperf_cmd:
+        console.print(f"[dim]MLPerf CLI found: {mlperf_cmd}[/dim]")
+    else:
+        # Also check ~/.local/bin
+        local_bin = os.path.expanduser("~/.local/bin")
+        for name in ("cr", "cmx"):
+            path = os.path.join(local_bin, name)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                mlperf_cmd = path
+                break
+        if mlperf_cmd:
+            console.print(f"[dim]MLPerf CLI found: {mlperf_cmd}[/dim]")
+        else:
+            console.print("[dim]MLPerf not installed (optional)[/dim]")
+            console.print("  [dim]To enable: pip install --user cmx4mlperf[/dim]")
 
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
