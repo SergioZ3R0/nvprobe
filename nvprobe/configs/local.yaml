@@ -32,3 +32,25 @@ benchmarks:
         - attention
       matrix_sizes: [512, 1024, 2048]
       iterations: 25
+
+  - name: hpl
+    enabled: true
+    params:
+      problem_sizes: [1024, 2048]
+      binary: "~/.nvprobe/tools/xhpl"
+
+  - name: hpcg
+    enabled: true
+    params:
+      grid_sizes: [64, 128]
+      binary: "~/.nvprobe/tools/xhpcg"
+
+  - name: mlperf
+    enabled: false    # requires: pip install --user cmx4mlperf
+    params:
+      scenario: Offline
+      model: resnet50
+      framework: onnxruntime
+      category: edge
+      implementation: reference
+      test_query_count: 100
