@@ -17,14 +17,26 @@ def _find_mlperf_cmd() -> str | None:
         path = shutil.which(name)
         if path:
             return path
-    # Also check ~/.local/bin where --user installs go
-    import os
     local_bin = os.path.expanduser("~/.local/bin")
     for name in ["cr", "cmx"]:
         path = os.path.join(local_bin, name)
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
     return None
+
+
+def _ensure_mlperf_deps() -> None:
+    """Pre-install dependencies cr needs but can't install itself (no root)."""
+    deps = ["loguru"]
+    env = subprocess_env()
+    for pkg in deps:
+        try:
+            __import__(pkg)
+        except ImportError:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--user", pkg],
+                capture_output=True, timeout=60, env=env,
+            )
 
 
 class MlperfBenchmark(BaseBenchmark):
@@ -48,6 +60,8 @@ class MlperfBenchmark(BaseBenchmark):
                 success=False,
                 error="MLPerf CLI not found. Install with: pip install --user cmx4mlperf",
             )
+
+        _ensure_mlperf_deps()
 
         cmd_name = "cr" if os.path.basename(mlperf_cmd) == "cr" else "cmx"
 
@@ -109,10 +123,16 @@ class MlperfBenchmark(BaseBenchmark):
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             stderr = getattr(exc, "stderr", "") or ""
+            error_msg = f"{exc}\n{stderr}".strip()
+            if "Permission denied" in error_msg:
+                error_msg += (
+                    "\n\nFix: pip install --user loguru"
+                    "\nThen re-run: nvprobe run --config <your-config> --local"
+                )
             return BenchmarkResult(
                 benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
-                success=False, error=f"{exc}\n{stderr}".strip(),
+                success=False, error=error_msg,
             )
 
     def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
@@ -125,6 +145,8 @@ class MlperfBenchmark(BaseBenchmark):
         test_query_count = self.params.get("test_query_count", 100)
 
         return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
+
+pip install --user loguru 2>/dev/null || true
 
 cr run-mlperf,inference,_find-performance,_full \\
     --model={model} \\
