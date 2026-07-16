@@ -6,6 +6,7 @@ import glob
 import os
 import shutil
 import site
+import subprocess
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -104,6 +105,149 @@ def _find_system_cuda_libs() -> list[str]:
     return found
 
 
+def _find_nccl_libs() -> list[str]:
+    """Find NCCL library directories (system or pip-installed nvidia-nccl-cuXX)."""
+    dirs: list[str] = []
+
+    # 1. Check pip-installed nvidia-nccl-cuXX package
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith("nvidia-nccl-cu"):
+                try:
+                    loc = dist.locate_file("").parent  # site-packages/
+                except Exception:
+                    loc = dist._path.parent
+                nccl_lib = str(loc / "nvidia" / "nccl" / "lib")
+                if os.path.isdir(nccl_lib) and nccl_lib not in dirs:
+                    dirs.append(nccl_lib)
+    except Exception:
+        pass
+
+    # 2. Search system paths for libnccl.so
+    candidates = [
+        "/usr/lib64",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/cuda/lib64",
+        "/usr/local/cuda/compat",
+    ]
+    for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
+        cuda_path = os.environ.get(env_var)
+        if cuda_path:
+            candidates.insert(0, os.path.join(cuda_path, "lib64"))
+            candidates.insert(0, os.path.join(cuda_path, "compat"))
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        toolkit_base = str(Path(nvcc).parent.parent)
+        for sub in ("lib64", "lib", "compat"):
+            p = os.path.join(toolkit_base, sub)
+            if p not in candidates:
+                candidates.insert(0, p)
+    # Also check paths derived from nvidia-smi
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        nvidia_dir = str(Path(nvidia_smi).parent)
+        for sub in ("", "../lib64", "../lib", "../compat"):
+            p = os.path.normpath(os.path.join(nvidia_dir, sub))
+            if p not in candidates:
+                candidates.insert(0, p)
+
+    for path in candidates:
+        p = os.path.realpath(path)
+        if not os.path.isdir(p):
+            continue
+        try:
+            files = os.listdir(p)
+        except OSError:
+            continue
+        if any(f.startswith("libnccl.so") for f in files):
+            if p not in dirs:
+                dirs.append(p)
+
+    return dirs
+
+
+# Libraries that NVIDIA HPC benchmark binaries may require at runtime.
+KNOWN_MISSING_LIBS = ("libcublas", "libmpi", "libnccl")
+
+
+def _guess_cuda_major() -> str:
+    """Roughly detect CUDA major version for diagnostic messages."""
+    try:
+        out = subprocess.run(
+            ["nvcc", "--version"], capture_output=True, text=True, timeout=5,
+        )
+        for line in out.stdout.splitlines():
+            if "release" in line:
+                ver = line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                return ver.split(".")[0]
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        ver = out.stdout.strip()
+        if ver:
+            major = ver.split(".")[0]
+            return "12" if int(major) >= 535 else "11"
+    except Exception:
+        pass
+    return "12"
+
+
+def _diagnose_missing_lib(lib_name: str, detail: str) -> str:
+    """Augment *detail* with a diagnostic hint for a missing shared library.
+
+    *lib_name* is one of the entries in ``KNOWN_MISSING_LIBS`` (e.g.
+    ``"libcublas"``, ``"libmpi"``, ``"libnccl"``).
+    Returns the original *detail* with an appended diagnostic message.
+    """
+    if lib_name == "libcublas":
+        searched = _find_system_cuda_libs() or []
+        cupy_libs = _find_cupy_cuda_libs() or []
+        detail += (
+            "\n\nCUDA runtime library not found. Install CUDA toolkit or a compatible runtime:\n"
+            "  - For NVIDIA HPC Benchmarks (CUDA 12): install CUDA 12.x\n"
+            "  - Or ensure cupy-cuda12x[ctk] is installed (bundles CUDA libs)\n"
+            f"  Searched system CUDA paths: {searched}\n"
+            f"  Searched cupy paths: {cupy_libs}\n"
+            "  Check: module avail cuda, module load cuda/12.x, or set CUDA_HOME"
+        )
+    elif lib_name == "libmpi":
+        mpi_envs = ["MPI_HOME", "OPAL_PREFIX", "I_MPI_ROOT"]
+        mpi_vals = {v: os.environ.get(v, "(not set)") for v in mpi_envs}
+        detail += (
+            "\n\nMPI library not found. Install an MPI implementation or load a module:\n"
+            "  - Ubuntu/Debian: sudo apt install mpich\n"
+            "  - RHEL/CentOS: sudo dnf install mpich\n"
+            "  - Cluster: module avail mpi, module load mpi/openmpi\n"
+            f"  MPI env vars: {mpi_vals}\n"
+            "  Check: which mpirun, mpirun --version"
+        )
+    elif lib_name == "libnccl":
+        nccl_system = _find_nccl_libs()
+        cupy_libs = _find_cupy_cuda_libs() or []
+        cuda_ver = _guess_cuda_major()
+        detail += (
+            "\n\nNCCL library not found. The NVIDIA HPC Benchmarks binaries require "
+            "libnccl.so at runtime.\n"
+            "  Install via pip (recommended):\n"
+            f"    pip install --user nvidia-nccl-cu{cuda_ver}\n"
+            "  Or install a system NCCL package:\n"
+            "    Ubuntu/Debian: sudo apt install libnccl2 libnccl-dev\n"
+            "    RHEL/CentOS:   sudo dnf install nccl\n"
+            "  Or load a NCCL module on HPC clusters:\n"
+            "    module avail nccl, module load nccl\n"
+            f"  Searched pip nvidia-nccl-cu* paths: {nccl_system}\n"
+            f"  Searched cupy paths: {cupy_libs}\n"
+            "  Check: CUDA_HOME/lib64, /usr/lib/x86_64-linux-gnu/libnccl*"
+        )
+    return detail
+
+
 def subprocess_env() -> dict[str, str]:
     """Return an environment dict with user site-packages and CUDA library paths."""
     env = os.environ.copy()
@@ -135,6 +279,7 @@ def subprocess_env() -> dict[str, str]:
     cuda_libs: list[str] = []
     cuda_libs.extend(_find_cupy_cuda_libs())
     cuda_libs.extend(_find_system_cuda_libs())
+    cuda_libs.extend(_find_nccl_libs())
 
     # Add MPI lib paths (for HPL/HPCG binaries compiled against MPI).
     # Only derive paths from mpirun (NOT srun — srun is the Slurm launcher,

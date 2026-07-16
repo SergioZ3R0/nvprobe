@@ -7,7 +7,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult, subprocess_env
+from nvprobe.benchmarks.base import (
+    BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
+    _diagnose_missing_lib, subprocess_env,
+)
 
 
 def _find_mpi_run() -> str | None:
@@ -62,30 +65,10 @@ def _run_hpcg_size(
         stdout = getattr(exc, "stdout", "") or ""
         detail = stderr.strip()[-500:] if stderr else stdout.strip()[-500:]
         if "cannot open shared object file" in detail:
-            if "libcublas" in detail:
-                from nvprobe.benchmarks.base import _find_system_cuda_libs, _find_cupy_cuda_libs
-                searched = _find_system_cuda_libs() or []
-                cupy_libs = _find_cupy_cuda_libs() or []
-                detail += (
-                    "\n\nCUDA runtime library not found. Install CUDA toolkit:\n"
-                    "  - For NVIDIA HPC Benchmarks (CUDA 12): install CUDA 12.x\n"
-                    "  - Or ensure cupy-cuda12x[ctk] is installed (bundles CUDA libs)\n"
-                    f"  Searched system CUDA paths: {searched}\n"
-                    f"  Searched cupy paths: {cupy_libs}\n"
-                    "  Check: module avail cuda, module load cuda/12.x, or set CUDA_HOME"
-                )
-            elif "libmpi" in detail:
-                from nvprobe.benchmarks.base import subprocess_env
-                mpi_envs = ["MPI_HOME", "OPAL_PREFIX", "I_MPI_ROOT"]
-                mpi_vals = {v: os.environ.get(v, "(not set)") for v in mpi_envs}
-                detail += (
-                    "\n\nMPI library not found. Install an MPI implementation or load a module:\n"
-                    "  - Ubuntu/Debian: sudo apt install mpich\n"
-                    "  - RHEL/CentOS: sudo dnf install mpich\n"
-                    "  - Cluster: module avail mpi, module load mpi/openmpi\n"
-                    f"  MPI env vars: {mpi_vals}\n"
-                    "  Check: which mpirun, mpirun --version"
-                )
+            for lib in KNOWN_MISSING_LIBS:
+                if lib in detail:
+                    detail = _diagnose_missing_lib(lib, detail)
+                    break
         return BenchmarkResult(
             benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
             precision=precision, batch_size=batch_size,
