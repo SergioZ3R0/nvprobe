@@ -2,10 +2,26 @@
 
 from __future__ import annotations
 
+import os
+import site
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+
+def subprocess_env() -> dict[str, str]:
+    """Return an environment dict that includes user site-packages."""
+    env = os.environ.copy()
+    user_site = site.getusersitepackages()
+    if user_site and os.path.isdir(user_site):
+        pythonpath = env.get("PYTHONPATH", "")
+        parts = [p for p in pythonpath.split(os.pathsep) if p]
+        if user_site not in parts:
+            parts.insert(0, user_site)
+        env["PYTHONPATH"] = os.pathsep.join(parts)
+    return env
 
 
 @dataclass

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import Any
 
-from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult
+from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult, subprocess_env
 
 
 class BandwidthBenchmark(BaseBenchmark):
@@ -30,6 +30,7 @@ class BandwidthBenchmark(BaseBenchmark):
         try:
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=600, check=True,
+                env=subprocess_env(),
             )
             data = json.loads(proc.stdout)
             return BenchmarkResult(
