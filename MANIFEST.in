@@ -2,3 +2,5 @@ include LICENSE
 include NOTICE
 include README.md
 recursive-include nvprobe *.py
+recursive-include nvprobe *.yaml
+recursive-include nvprobe *.svg

@@ -71,7 +71,6 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
         return ""
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    x_pos = 0
     width = 0.25
     gpu_names = list(grouped.keys())
 
@@ -219,7 +218,7 @@ def generate_report(
         "gpu_comparison": _chart_gpu_comparison(results),
     }
 
-    html = _render_html(report_title, latest_run, results, env_info, charts)
+    html = _render_html(report_title, latest_run, results, env_info, charts, logo_src.exists())
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -277,6 +276,7 @@ def _render_html(
     results: list[dict[str, Any]],
     env_info: dict[str, Any],
     charts: dict[str, str],
+    has_logo: bool = True,
 ) -> str:
     """Render the main report HTML with sidebar, charts, and tables."""
     gpus = env_info.get("gpus", [])
@@ -368,7 +368,7 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
 <body>
 <nav class="sidebar">
     <div class="sidebar-header">
-        <img src="nvprobe.svg" alt="nvProbe" style="width:80px;margin-bottom:0.5rem;">
+        {'<img src="nvprobe.svg" alt="nvProbe" style="width:80px;margin-bottom:0.5rem;">' if has_logo else ''}
         <div class="sidebar-title">nvProbe</div>
         <div class="sidebar-subtitle">GPU Benchmark Suite</div>
     </div>
@@ -488,7 +488,7 @@ def _render_comparison_html(
                         all_vals_b.append(v["gflops"])
 
     chart_b64 = ""
-    if all_labels and all_vals_a:
+    if all_labels and all_vals_a and all_vals_b:
         fig, ax = plt.subplots(figsize=(12, 6))
         x = range(len(all_labels))
         w = 0.35

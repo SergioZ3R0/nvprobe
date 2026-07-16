@@ -138,7 +138,9 @@ def _do_init(force: bool = False) -> None:
 
 def _do_setup_tools(force: bool = False) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
+    import os
     import platform
+    import shutil
     import subprocess
     import tarfile
     import tempfile

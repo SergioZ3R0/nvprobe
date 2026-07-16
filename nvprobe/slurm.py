@@ -175,6 +175,8 @@ class SlurmManager:
             # sbatch output: "Submitted batch job 12345"
             job_id = proc.stdout.strip().split()[-1]
             parts = script_path.stem.split("_")
+            # Build the job_name exactly as _build_header does
+            job_name = f"nvprobe-{parts[0]}-gpu{parts[1].replace('gpu', '')}-{parts[2]}-bs{parts[3].replace('bs', '')}"
             return SlurmJob(
                 job_id=job_id,
                 benchmark=parts[0],
@@ -182,7 +184,7 @@ class SlurmManager:
                 precision=parts[2],
                 batch_size=int(parts[3].replace("bs", "")),
                 script_path=script_path,
-                output_path=self.jobs_dir / f"{script_path.stem}_{job_id}.out",
+                output_path=self.jobs_dir / f"{job_name}_{job_id}.out",
             )
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
             print(f"WARNING: failed to submit {script_path.name}: {exc}")

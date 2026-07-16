@@ -158,11 +158,18 @@ class MlperfBenchmark(BaseBenchmark):
         implementation = self.params.get("implementation", "reference")
         test_query_count = self.params.get("test_query_count", 100)
 
+        mlperf_cmd = _find_mlperf_cmd()
+        cmd_name = os.path.basename(mlperf_cmd) if mlperf_cmd else "cr"
+        if cmd_name in ("cr", "mlcr"):
+            mlperf_line = f"{cmd_name} run-mlperf,inference \\"
+        else:
+            mlperf_line = f"{cmd_name} run \\"
+
         return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 pip install --user loguru 2>/dev/null || true
 
-cr run-mlperf,inference \\
+{mlperf_line}
     --model={model} \\
     --implementation={implementation} \\
     --framework={framework} \\
