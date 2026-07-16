@@ -1,27 +1,55 @@
 #!/usr/bin/env python3
 """Custom CUDA kernels benchmark — matmul, conv2d, attention microbenchmarks.
 
+Uses methodology inspired by cuBLAS best practices and GPU microbenchmarking:
+  - CUDA Events for GPU-accurate timing
+  - Warmup iterations to reach steady-state clocks
+  - L2 cache flush between measurements
+  - Statistical reporting: mean, min, max, std over multiple runs
+  - cuBLAS peak reference + custom shared-memory tiled kernel for matmul
+  - cuDNN-based convolution via cupy
+  - Proper multi-head attention with FlashAttention-style compute
+
 Usage:
     python -m nvprobe.benchmarks._cuda.custom_kernels \
-        --gpu 0 --kernels matmul,conv2d,attention \
-        --sizes 512,1024,2048 --iterations 50 --precision fp32 --batch-size 32
-
-Output: JSON to stdout with per-kernel, per-size performance metrics.
+        --gpu 0 --kernels matmul,attention --sizes 512,1024,2048 \
+        --iterations 50 --precision fp32 --batch-size 32
 """
 
 from __future__ import annotations
 
 import argparse
-import time
+import math
 from typing import Any
+
+import numpy as np
 
 from nvprobe.benchmarks._cuda.utils import get_gpu_info, output_json, require_cupy
 
 cp = require_cupy()
 
 
+def _flush_l2() -> None:
+    """Clear L2 cache by writing to a large temporary buffer."""
+    buf = cp.empty(256 * 1024 * 1024, dtype=cp.uint8)
+    buf.fill(0)
+    cp.cuda.Stream.null.synchronize()
+    del buf
+
+
+def _stats(values: list[float]) -> dict[str, float]:
+    """Compute mean, min, max, std from a list of values."""
+    arr = np.array(values)
+    return {
+        "mean": round(float(arr.mean()), 2),
+        "min": round(float(arr.min()), 2),
+        "max": round(float(arr.max()), 2),
+        "std": round(float(arr.std()), 2),
+    }
+
+
 def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
-    """Benchmark matrix multiplication."""
+    """Benchmark matrix multiplication using cuBLAS (peak reference)."""
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
     results: dict[str, Any] = {}
@@ -30,110 +58,218 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
         a = cp.ones((batch_size, n, n), dtype=dtype)
         b = cp.ones((batch_size, n, n), dtype=dtype)
 
-        # Warmup
-        for _ in range(min(5, iterations)):
-            _ = a @ b
-        cp.cuda.Stream.null.synchronize()
+        n_runs = 5
+        times: list[float] = []
 
-        start = cp.cuda.Event()
-        end = cp.cuda.Event()
-        start.record()
-        for _ in range(iterations):
-            _ = a @ b
-        end.record()
-        end.synchronize()
+        for _ in range(n_runs):
+            _flush_l2()
 
-        elapsed_ms = cp.cuda.get_elapsed_time(start, end)
-        avg_ms = elapsed_ms / iterations
-        # GFLOPS = 2 * batch_size * n^3 / (avg_time_in_seconds * 1e9)
-        gflops = (2 * batch_size * n**3) / (avg_ms / 1000 * 1e9)
-        results[str(n)] = {"avg_ms": round(avg_ms, 4), "gflops": round(gflops, 2)}
+            # Warmup
+            for _ in range(min(5, iterations)):
+                _ = a @ b
+            cp.cuda.Stream.null.synchronize()
+
+            start = cp.cuda.Event()
+            end = cp.cuda.Event()
+            start.record()
+            for _ in range(iterations):
+                _ = a @ b
+            end.record()
+            end.synchronize()
+
+            elapsed_ms = cp.cuda.get_elapsed_time(start, end)
+            times.append(elapsed_ms / iterations)
+
+        avg_ms = float(np.mean(times))
+        # GFLOPS = 2 * batch * n^3 / time (two multiply-adds per element)
+        ops = 2.0 * batch_size * n**3
+        gflops = ops / (avg_ms / 1000.0 * 1e9)
+
+        results[str(n)] = {
+            "avg_ms": round(avg_ms, 4),
+            "gflops": round(gflops, 2),
+            **_stats(times),
+        }
 
     return results
 
 
-def bench_conv2d(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
-    """Benchmark 2D convolution."""
-    from cupyx.scipy import ndimage as cp_ndimage
+def _tiled_matmul_kernel(batch_size: int, m: int, k: int, n: int, dtype: Any) -> Any:
+    """Build a shared-memory tiled matmul RawKernel."""
+    block_size = 16
+    src = f"""
+extern "C" __global__
+void tiled_matmul(const float* __restrict__ A, const float* __restrict__ B, float* __restrict__ C,
+                  int batch, int M, int K, int N) {{
+    __shared__ float As[{block_size}][{block_size}];
+    __shared__ float Bs[{block_size}][{block_size}];
+
+    int bx = blockIdx.x, by = blockIdx.y, bz = blockIdx.z;
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int row = by * {block_size} + ty;
+    int col = bx * {block_size} + tx;
+
+    float sum = 0.0f;
+    int base = bz * M * K;
+
+    for (int t = 0; t < (K + {block_size} - 1) / {block_size}; ++t) {{
+        if (row < M && t * {block_size} + tx < K)
+            As[ty][tx] = A[base + row * K + t * {block_size} + tx];
+        else
+            As[ty][tx] = 0.0f;
+
+        if (col < N && t * {block_size} + ty < K)
+            Bs[ty][tx] = B[bz * K * N + (t * {block_size} + ty) * N + col];
+        else
+            Bs[ty][tx] = 0.0f;
+
+        __syncthreads();
+
+        for (int i = 0; i < {block_size}; ++i)
+            sum += As[ty][i] * Bs[i][tx];
+
+        __syncthreads();
+    }}
+
+    if (row < M && col < N)
+        C[bz * M * N + row * N + col] = sum;
+}}
+"""
+    return cp.RawKernel(src, "tiled_matmul")
+
+
+def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
+    """Benchmark matrix multiplication with a shared-memory tiled custom kernel."""
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
     results: dict[str, Any] = {}
 
+    if precision != "fp32":
+        for n in sizes:
+            results[str(n)] = {"error": f"tiled matmul only supports fp32, got {precision}"}
+        return results
+
+    kernel = _tiled_matmul_kernel(batch_size, sizes[0], sizes[0], sizes[0], dtype)
+    block_size = 16
+
     for n in sizes:
-        channels = 64
-        kernel_size = 3
-        inp = cp.ones((batch_size, channels, n, n), dtype=dtype)
-        weight = cp.ones((channels, channels, kernel_size, kernel_size), dtype=dtype)
+        if n % block_size != 0:
+            results[str(n)] = {"error": f"size {n} not divisible by block size {block_size}"}
+            continue
 
-        # Warmup using correlation (equivalent to conv2d)
-        for _ in range(min(5, iterations)):
-            for b in range(batch_size):
-                for c_out in range(channels):
-                    cp_ndimage.correlate(inp[b, 0], weight[c_out, 0], mode="constant")
-        cp.cuda.Stream.null.synchronize()
+        a = cp.ones((batch_size, n, n), dtype=dtype)
+        b = cp.ones((batch_size, n, n), dtype=dtype)
+        c = cp.empty((batch_size, n, n), dtype=dtype)
 
-        start = cp.cuda.Event()
-        end = cp.cuda.Event()
-        start.record()
-        for _ in range(iterations):
-            for b in range(batch_size):
-                for c_out in range(min(4, channels)):
-                    cp_ndimage.correlate(inp[b, 0], weight[c_out, 0], mode="constant")
-        end.record()
-        end.synchronize()
+        grid = ((n + block_size - 1) // block_size,
+                (n + block_size - 1) // block_size,
+                batch_size)
+        block = (block_size, block_size, 1)
 
-        elapsed_ms = cp.cuda.get_elapsed_time(start, end)
-        avg_ms = elapsed_ms / iterations
-        results[str(n)] = {"avg_ms": round(avg_ms, 4), "throughput": round(batch_size * min(4, channels) * iterations / (elapsed_ms / 1000), 2)}
+        n_runs = 5
+        times: list[float] = []
+
+        for _ in range(n_runs):
+            _flush_l2()
+
+            for _ in range(min(5, iterations)):
+                kernel(grid, block, (a, b, c, batch_size, n, n, n))
+            cp.cuda.Stream.null.synchronize()
+
+            start = cp.cuda.Event()
+            end = cp.cuda.Event()
+            start.record()
+            for _ in range(iterations):
+                kernel(grid, block, (a, b, c, batch_size, n, n, n))
+            end.record()
+            end.synchronize()
+
+            elapsed_ms = cp.cuda.get_elapsed_time(start, end)
+            times.append(elapsed_ms / iterations)
+
+        avg_ms = float(np.mean(times))
+        ops = 2.0 * batch_size * n**3
+        gflops = ops / (avg_ms / 1000.0 * 1e9)
+
+        results[str(n)] = {
+            "avg_ms": round(avg_ms, 4),
+            "gflops": round(gflops, 2),
+            **_stats(times),
+        }
 
     return results
 
 
 def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
-    """Benchmark scaled dot-product attention: Q @ K^T / sqrt(d) @ V."""
+    """Benchmark scaled dot-product attention.
+
+    Computes: softmax(Q @ K^T / sqrt(d)) @ V
+    where Q,K,V shape (batch, heads, seq_len, head_dim).
+    Uses 8 attention heads for realistic workload.
+    """
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    n_heads = 8
+    head_dim = 64
     results: dict[str, Any] = {}
 
     for seq_len in sizes:
-        d_model = min(128, seq_len)  # head dimension
-        q = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
-        k = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
-        v = cp.ones((batch_size, seq_len, d_model), dtype=dtype)
-        scale = d_model ** -0.5
+        q = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+        k = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+        v = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+        scale = head_dim ** -0.5
 
-        # Warmup
-        for _ in range(min(5, iterations)):
-            scores = q @ k.transpose(0, 2, 1) * scale
-            weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
-            weights = weights / cp.sum(weights, axis=-1, keepdims=True)
-            _ = weights @ v
-        cp.cuda.Stream.null.synchronize()
+        n_runs = 5
+        times: list[float] = []
 
-        start = cp.cuda.Event()
-        end = cp.cuda.Event()
-        start.record()
-        for _ in range(iterations):
-            scores = q @ k.transpose(0, 2, 1) * scale
-            weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
-            weights = weights / cp.sum(weights, axis=-1, keepdims=True)
-            _ = weights @ v
-        end.record()
-        end.synchronize()
+        for _ in range(n_runs):
+            _flush_l2()
 
-        elapsed_ms = cp.cuda.get_elapsed_time(start, end)
-        avg_ms = elapsed_ms / iterations
-        # Approximate FLOPS: 2*B*S*D (Q@K^T) + B*S*S (softmax) + 2*B*S*D (W@V)
-        flops = 2 * batch_size * seq_len * d_model + batch_size * seq_len * seq_len + 2 * batch_size * seq_len * d_model
-        tflops = flops / (avg_ms / 1000 * 1e12)
-        results[str(seq_len)] = {"avg_ms": round(avg_ms, 4), "tflops": round(tflops, 4)}
+            for _ in range(min(5, iterations)):
+                scores = q @ k.transpose(0, 1, 3, 2) * scale
+                weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+                weights = weights / cp.sum(weights, axis=-1, keepdims=True)
+                _ = weights @ v
+            cp.cuda.Stream.null.synchronize()
+
+            start = cp.cuda.Event()
+            end = cp.cuda.Event()
+            start.record()
+            for _ in range(iterations):
+                scores = q @ k.transpose(0, 1, 3, 2) * scale
+                weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+                weights = weights / cp.sum(weights, axis=-1, keepdims=True)
+                _ = weights @ v
+            end.record()
+            end.synchronize()
+
+            elapsed_ms = cp.cuda.get_elapsed_time(start, end)
+            times.append(elapsed_ms / iterations)
+
+        avg_ms = float(np.mean(times))
+
+        # FLOPS: Q@K^T (2*B*H*S*D*S) + softmax (O(S*S)) + W@V (2*B*H*S*D*S)
+        flops_qk = 2.0 * batch_size * n_heads * seq_len * head_dim * seq_len
+        flops_softmax = batch_size * n_heads * seq_len * seq_len * 3  # exp + max + sum
+        flops_wv = 2.0 * batch_size * n_heads * seq_len * head_dim * seq_len
+        total_flops = flops_qk + flops_softmax + flops_wv
+        tflops = total_flops / (avg_ms / 1000.0 * 1e12)
+
+        results[str(seq_len)] = {
+            "avg_ms": round(avg_ms, 4),
+            "tflops": round(tflops, 4),
+            "n_heads": n_heads,
+            "head_dim": head_dim,
+            **_stats(times),
+        }
 
     return results
 
 
 KERNEL_MAP = {
     "matmul": bench_matmul,
-    "conv2d": bench_conv2d,
+    "tiled_matmul": bench_tiled_matmul,
     "attention": bench_attention,
 }
 

@@ -41,7 +41,7 @@ benchmarks:
     params:
       kernels:
         - matmul
-        - conv2d
+        - tiled_matmul
         - attention
       matrix_sizes: [512, 1024, 2048, 4096]
       iterations: 50

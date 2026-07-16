@@ -58,6 +58,13 @@ def _parse_metrics(metrics_raw: str | dict) -> dict[str, Any]:
         return {}
 
 
+def _extract_val(v: Any, key: str = "mean") -> float:
+    """Extract a scalar from value that may be a dict with stats or a bare number."""
+    if isinstance(v, dict):
+        return float(v.get(key, v.get("mean", 0)))
+    return float(v)
+
+
 def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
     """Generate bandwidth comparison chart."""
     grouped: dict[str, dict] = {}
@@ -76,9 +83,9 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
 
     for i, (gpu, data) in enumerate(grouped.items()):
         sizes = list(data.get("h2d", {}).keys())
-        h2d_vals = list(data.get("h2d", {}).values())
-        d2h_vals = list(data.get("d2h", {}).values())
-        d2d_vals = list(data.get("d2d", {}).values())
+        h2d_vals = [_extract_val(v, "mean") for v in data.get("h2d", {}).values()]
+        d2h_vals = [_extract_val(v, "mean") for v in data.get("d2h", {}).values()]
+        d2d_vals = [_extract_val(v, "mean") for v in data.get("d2d", {}).values()]
 
         x = [j + i * width for j in range(len(sizes))]
         ax.bar([xi - width for xi in x], h2d_vals, width, label=f"{gpu} H2D", color=SERIES_COLORS[i * 3 % len(SERIES_COLORS)])
@@ -86,7 +93,7 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
         ax.bar([xi + width for xi in x], d2d_vals, width, label=f"{gpu} D2D", color=SERIES_COLORS[(i * 3 + 2) % len(SERIES_COLORS)])
 
     ax.set_xlabel("Buffer Size (MB)")
-    ax.set_ylabel("Bandwidth (MB/s)")
+    ax.set_ylabel("Bandwidth (GB/s)")
     ax.set_title("Memory Bandwidth by Buffer Size")
     ax.set_xticks([i + width * (len(gpu_names) - 1) / 2 for i in range(len(sizes))])
     ax.set_xticklabels(sizes)
@@ -118,6 +125,34 @@ def _chart_matmul(results: list[dict[str, Any]]) -> str:
     ax.set_xlabel("Matrix Size (N×N)")
     ax.set_ylabel("GFLOPS")
     ax.set_title("Matrix Multiplication Performance")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+
+    return _fig_to_base64(fig)
+
+
+def _chart_tiled_matmul(results: list[dict[str, Any]]) -> str:
+    """Generate tiled matmul GFLOPS scaling chart."""
+    grouped: dict[str, dict] = {}
+    for r in results:
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        tiled = metrics.get("tiled_matmul", {})
+        if tiled:
+            key = f"GPU {r['gpu_index']} ({r['gpu_model']}) — {r['precision']}"
+            grouped[key] = tiled
+
+    if not grouped:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for i, (label, data) in enumerate(grouped.items()):
+        sizes = [int(k) for k in data.keys()]
+        gflops = [v.get("gflops", 0) for v in data.values()]
+        ax.plot(sizes, gflops, "^-", label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)], linewidth=2, markersize=6)
+
+    ax.set_xlabel("Matrix Size (N×N)")
+    ax.set_ylabel("GFLOPS")
+    ax.set_title("Tiled MatMul Performance (Shared Memory)")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
 
@@ -214,6 +249,7 @@ def generate_report(
     charts = {
         "bandwidth": _chart_bandwidth(results),
         "matmul": _chart_matmul(results),
+        "tiled_matmul": _chart_tiled_matmul(results),
         "attention": _chart_attention(results),
         "gpu_comparison": _chart_gpu_comparison(results),
     }
@@ -289,6 +325,8 @@ def _render_html(
         chart_html += f'<div class="chart"><img src="{charts["bandwidth"]}" alt="Bandwidth"></div>\n'
     if charts.get("matmul"):
         chart_html += f'<div class="chart"><img src="{charts["matmul"]}" alt="Matmul"></div>\n'
+    if charts.get("tiled_matmul"):
+        chart_html += f'<div class="chart"><img src="{charts["tiled_matmul"]}" alt="Tiled Matmul"></div>\n'
     if charts.get("attention"):
         chart_html += f'<div class="chart"><img src="{charts["attention"]}" alt="Attention"></div>\n'
     if charts.get("gpu_comparison"):
