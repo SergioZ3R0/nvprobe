@@ -21,7 +21,11 @@ def _find_cupy_cuda_libs() -> list[str]:
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"]
             if name.startswith("cupy-cuda"):
-                loc = dist._path.parent  # site-packages/
+                # Use public locate_file() API (Python 3.9+), fall back to _path
+                try:
+                    loc = dist.locate_file("").parent  # site-packages/
+                except Exception:
+                    loc = dist._path.parent
                 # [ctk] installs libs under cupy_cudaXXX.libs/
                 for pattern in glob.glob(str(loc / f"{name.replace('-', '_')}.libs" / "*")):
                     d = os.path.dirname(pattern)
@@ -35,6 +39,22 @@ def _find_cupy_cuda_libs() -> list[str]:
                         dirs.append(p)
     except Exception:
         pass
+    # Fallback: search common site-packages for any cupy_cuda*.libs
+    if not dirs:
+        candidates = set()
+        try:
+            candidates.add(site.getusersitepackages())
+        except Exception:
+            pass
+        try:
+            candidates.update(site.getsitepackages())
+        except Exception:
+            pass
+        for sp in candidates:
+            if sp and os.path.isdir(sp):
+                for d in glob.glob(os.path.join(sp, "cupy_cuda*.libs")):
+                    if os.path.isdir(d) and d not in dirs:
+                        dirs.append(d)
     return dirs
 
 
@@ -116,13 +136,23 @@ def subprocess_env() -> dict[str, str]:
     cuda_libs.extend(_find_cupy_cuda_libs())
     cuda_libs.extend(_find_system_cuda_libs())
 
-    # Also add MPI lib paths (for HPL/HPCG binaries compiled against MPI)
-    for mpi_name in ["mpirun", "srun"]:
+    # Add MPI lib paths (for HPL/HPCG binaries compiled against MPI).
+    # Only derive paths from mpirun (NOT srun — srun is the Slurm launcher,
+    # its location is unrelated to MPI libraries).
+    for mpi_name in ["mpirun"]:
         mpi_bin = shutil.which(mpi_name)
         if mpi_bin:
             mpi_base = str(Path(mpi_bin).parent.parent)
             for sub in ("lib", "lib64"):
                 ml = os.path.join(mpi_base, sub)
+                if os.path.isdir(ml) and ml not in cuda_libs:
+                    cuda_libs.append(ml)
+    # Also check common MPI environment variables set by module systems
+    for env_var in ("MPI_HOME", "OPAL_PREFIX", "I_MPI_ROOT"):
+        mpi_path = os.environ.get(env_var)
+        if mpi_path:
+            for sub in ("lib", "lib64"):
+                ml = os.path.join(mpi_path, sub)
                 if os.path.isdir(ml) and ml not in cuda_libs:
                     cuda_libs.append(ml)
 

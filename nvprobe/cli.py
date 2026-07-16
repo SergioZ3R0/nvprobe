@@ -136,7 +136,39 @@ def _do_init(force: bool = False) -> None:
     console.print("  nvprobe run --config nvprobe/configs/local.yaml --local")
 
 
-def _do_setup_tools(force: bool = False) -> None:
+def _detect_cuda_major() -> str | None:
+    """Detect CUDA major version via nvcc or nvidia-smi."""
+    import subprocess
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        try:
+            out = subprocess.run(
+                [nvcc, "--version"], capture_output=True, text=True, check=True,
+            )
+            for line in out.stdout.splitlines():
+                if "release" in line:
+                    ver = line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                    return ver.split(".")[0]
+        except Exception:
+            pass
+    # Fallback: try nvidia-smi to get driver version, assume CUDA >= driver
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True, text=True, check=True,
+        )
+        ver = out.stdout.strip()
+        if ver:
+            major = ver.split(".")[0]
+            # Rough CUDA version from driver: R535 → CUDA 12, R525 → CUDA 11, etc.
+            # This is not exact but good enough for choosing tarball variant
+            return "12" if int(major) >= 535 else "11"
+    except Exception:
+        pass
+    return None
+
+
+def _do_setup_tools(force: bool = False, cuda_version: str | None = None) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     import os
     import platform
@@ -145,6 +177,10 @@ def _do_setup_tools(force: bool = False) -> None:
     import tarfile
     import tempfile
     import urllib.request
+
+    # Auto-detect CUDA version if not provided
+    if cuda_version is None:
+        cuda_version = _detect_cuda_major() or "12"
 
     tools_dir = Path.home() / ".nvprobe" / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
@@ -158,9 +194,12 @@ def _do_setup_tools(force: bool = False) -> None:
     )
 
     benchmarks = {
-        "HPL":  (f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/cuda12/hpl-linux-{arch}/xhpl", "xhpl"),
-        "HPCG": (f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/cuda12/hpcg-linux-{arch}/xhpcg", "xhpcg"),
+        "HPL":  ("hpl-linux-{arch}/xhpl", "xhpl"),
+        "HPCG": ("hpcg-linux-{arch}/xhpcg", "xhpcg"),
     }
+
+    def _build_internal_path(cuda_dir: str, template: str) -> str:
+        return f"nvidia_hpc_benchmarks_mpich-linux-{arch}-{nvidia_version}-archive/{cuda_dir}/{template.format(arch=arch)}"
 
     for label, (internal_path, final_name) in benchmarks.items():
         target = tools_dir / final_name
@@ -186,7 +225,37 @@ def _do_setup_tools(force: bool = False) -> None:
 
             console.print("  Extracting...")
             with tarfile.open(tarball_path, "r:xz") as tar:
-                for label, (internal_path, final_name) in needed.items():
+                # Discover available CUDA variants in the tarball
+                cuda_dirs: list[str] = []
+                for member in tar.getmembers():
+                    parts = member.name.split("/")
+                    if len(parts) >= 3 and parts[0].startswith("nvidia_hpc_benchmarks"):
+                        dirname = parts[1]
+                        if dirname.startswith("cuda") and dirname not in cuda_dirs:
+                            cuda_dirs.append(dirname)
+                cuda_dirs.sort(reverse=True)  # prefer newest
+
+                if not cuda_dirs:
+                    console.print("  [yellow]No CUDA variants found in tarball[/yellow]")
+                    return
+
+                # Pick the best CUDA variant: prefer exact match, then fallback
+                cuda_target = f"cuda{cuda_version}"
+                if cuda_target in cuda_dirs:
+                    selected_cuda = cuda_target
+                else:
+                    # Fallback to the latest available variant
+                    selected_cuda = cuda_dirs[0]
+                    if cuda_target != selected_cuda:
+                        console.print(
+                            f"  [yellow]CUDA {cuda_version} variant not found in tarball, "
+                            f"using {selected_cuda} instead[/yellow]"
+                        )
+
+                console.print(f"  [dim]Using CUDA variant: {selected_cuda}[/dim]")
+
+                for label, (template, final_name) in needed.items():
+                    internal_path = _build_internal_path(selected_cuda, template)
                     try:
                         member = tar.getmember(internal_path)
                         member.name = final_name
@@ -241,7 +310,7 @@ def setup_tools(
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already installed."),
 ) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
-    _do_setup_tools(force=force)
+    _do_setup_tools(force=force)  # cuda_version auto-detected inside
 
 
 @app.command()
@@ -327,7 +396,7 @@ def setup(
 
     # --- Step 2: Download HPL/HPCG/MLPerf ---
     console.print("\n[bold]Step 2: Install HPL, HPCG, MLPerf[/bold]")
-    _do_setup_tools(force=force)
+    _do_setup_tools(force=force, cuda_version=cuda_major if cuda_ver else None)
 
     # --- Step 3: Generate configs ---
     console.print("\n[bold]Step 3: Generate configs[/bold]")

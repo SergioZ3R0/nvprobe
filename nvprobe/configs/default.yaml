@@ -49,14 +49,15 @@ benchmarks:
   - name: hpl
     enabled: true
     params:
-      problem_sizes: [1024, 2048, 4096]
-      # Binary from nvprobe setup-tools, or system PATH
+      # Matrix sizes (N). Auto-calculated from GPU memory if empty.
+      problem_sizes: [4096, 8192, 16384]
       binary: "~/.nvprobe/tools/xhpl"
 
   - name: hpcg
     enabled: true
     params:
-      grid_sizes: [64, 128, 256]
+      # 3D grid sizes (uniform nx=ny=nz). 256^3 ~2.9 GB, 512^3 ~23 GB for FP64.
+      grid_sizes: [128, 256, 512]
       binary: "~/.nvprobe/tools/xhpcg"
 
   - name: mlperf

@@ -52,11 +52,20 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
     """Benchmark matrix multiplication using cuBLAS (peak reference)."""
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    pool = cp.get_default_memory_pool()
     results: dict[str, Any] = {}
 
     for n in sizes:
-        a = cp.ones((batch_size, n, n), dtype=dtype)
-        b = cp.ones((batch_size, n, n), dtype=dtype)
+        try:
+            pool.free_all_blocks()
+            a = cp.ones((batch_size, n, n), dtype=dtype)
+            b = cp.ones((batch_size, n, n), dtype=dtype)
+        except cp.cuda.memory.OutOfMemoryError as exc:
+            results[str(n)] = {"error": f"OOM allocating matmul inputs for size {n}: {exc}"}
+            continue
+        except Exception as exc:
+            results[str(n)] = {"error": f"allocation failed for size {n}: {exc}"}
+            continue
 
         n_runs = 5
         times: list[float] = []
@@ -64,10 +73,10 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
         for _ in range(n_runs):
             _flush_l2()
 
-            # Warmup
             for _ in range(min(5, iterations)):
                 _ = a @ b
             cp.cuda.Stream.null.synchronize()
+            pool.free_all_blocks()
 
             start = cp.cuda.Event()
             end = cp.cuda.Event()
@@ -81,7 +90,6 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
             times.append(elapsed_ms / iterations)
 
         avg_ms = float(np.mean(times))
-        # GFLOPS = 2 * batch * n^3 / time (two multiply-adds per element)
         ops = 2.0 * batch_size * n**3
         gflops = ops / (avg_ms / 1000.0 * 1e9)
 
@@ -143,6 +151,7 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
     """Benchmark matrix multiplication with a shared-memory tiled custom kernel."""
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    pool = cp.get_default_memory_pool()
     results: dict[str, Any] = {}
 
     if precision != "fp32":
@@ -150,6 +159,7 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
             results[str(n)] = {"error": f"tiled matmul only supports fp32, got {precision}"}
         return results
 
+    pool.free_all_blocks()
     kernel = _tiled_matmul_kernel(batch_size, sizes[0], sizes[0], sizes[0], dtype)
     block_size = 16
 
@@ -158,9 +168,17 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
             results[str(n)] = {"error": f"size {n} not divisible by block size {block_size}"}
             continue
 
-        a = cp.ones((batch_size, n, n), dtype=dtype)
-        b = cp.ones((batch_size, n, n), dtype=dtype)
-        c = cp.empty((batch_size, n, n), dtype=dtype)
+        try:
+            pool.free_all_blocks()
+            a = cp.ones((batch_size, n, n), dtype=dtype)
+            b = cp.ones((batch_size, n, n), dtype=dtype)
+            c = cp.empty((batch_size, n, n), dtype=dtype)
+        except cp.cuda.memory.OutOfMemoryError as exc:
+            results[str(n)] = {"error": f"OOM allocating inputs for size {n}: {exc}"}
+            continue
+        except Exception as exc:
+            results[str(n)] = {"error": f"allocation failed for size {n}: {exc}"}
+            continue
 
         grid = ((n + block_size - 1) // block_size,
                 (n + block_size - 1) // block_size,
@@ -176,6 +194,7 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
             for _ in range(min(5, iterations)):
                 kernel(grid, block, (a, b, c, batch_size, n, n, n))
             cp.cuda.Stream.null.synchronize()
+            pool.free_all_blocks()
 
             start = cp.cuda.Event()
             end = cp.cuda.Event()
@@ -201,57 +220,98 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
     return results
 
 
+def _attention_fits_memory(seq_len: int, batch_size: int, dtype_size: int, free_bytes: int, margin: float = 0.75) -> bool:
+    """Check if attention kernel fits in available GPU memory."""
+    n_heads = 8
+    head_dim = 64
+    qkv = 3 * batch_size * n_heads * seq_len * head_dim * dtype_size
+    scores = batch_size * n_heads * seq_len * seq_len * dtype_size
+    workspace = int(scores * 0.2)
+    peak = qkv + scores + workspace
+    return peak <= int(free_bytes * margin)
+
+
 def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
     """Benchmark scaled dot-product attention.
 
     Computes: softmax(Q @ K^T / sqrt(d)) @ V
     where Q,K,V shape (batch, heads, seq_len, head_dim).
     Uses 8 attention heads for realistic workload.
+    Memory-safe: checks available memory per size, skips if insufficient.
     """
     cp.cuda.Device(gpu_index).use()
     dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
     n_heads = 8
     head_dim = 64
     results: dict[str, Any] = {}
+    pool = cp.get_default_memory_pool()
 
     for seq_len in sizes:
-        q = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
-        k = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
-        v = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+        pool.free_all_blocks()
+        free_bytes, _ = cp.cuda.runtime.memGetInfo()
+
+        if not _attention_fits_memory(seq_len, batch_size, cp.dtype(dtype).itemsize, free_bytes):
+            peak_est = 3 * batch_size * n_heads * seq_len * head_dim * cp.dtype(dtype).itemsize
+            peak_est += batch_size * n_heads * seq_len * seq_len * cp.dtype(dtype).itemsize
+            peak_est = int(peak_est * 1.2)
+            results[str(seq_len)] = {
+                "error": f"insufficient GPU memory for seq_len={seq_len}, bs={batch_size} "
+                         f"(need ~{peak_est // 1024**2} MB, avail ~{int(free_bytes * 0.75) // 1024**2} MB)"
+            }
+            continue
+
+        try:
+            q = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+            k = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+            v = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
+        except cp.cuda.memory.OutOfMemoryError as exc:
+            results[str(seq_len)] = {"error": f"OOM allocating QKV for seq_len={seq_len}: {exc}"}
+            continue
+        except Exception as exc:
+            results[str(seq_len)] = {"error": f"allocation failed for seq_len={seq_len}: {exc}"}
+            continue
+
         scale = head_dim ** -0.5
 
         n_runs = 5
         times: list[float] = []
 
-        for _ in range(n_runs):
-            _flush_l2()
+        try:
+            for _ in range(n_runs):
+                _flush_l2()
 
-            for _ in range(min(5, iterations)):
-                scores = q @ k.transpose(0, 1, 3, 2) * scale
-                weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
-                weights = weights / cp.sum(weights, axis=-1, keepdims=True)
-                _ = weights @ v
-            cp.cuda.Stream.null.synchronize()
+                for _ in range(min(5, iterations)):
+                    scores = q @ k.transpose(0, 1, 3, 2) * scale
+                    weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+                    weights = weights / cp.sum(weights, axis=-1, keepdims=True)
+                    _ = weights @ v
+                cp.cuda.Stream.null.synchronize()
+                pool.free_all_blocks()
 
-            start = cp.cuda.Event()
-            end = cp.cuda.Event()
-            start.record()
-            for _ in range(iterations):
-                scores = q @ k.transpose(0, 1, 3, 2) * scale
-                weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
-                weights = weights / cp.sum(weights, axis=-1, keepdims=True)
-                _ = weights @ v
-            end.record()
-            end.synchronize()
+                start = cp.cuda.Event()
+                end = cp.cuda.Event()
+                start.record()
+                for _ in range(iterations):
+                    scores = q @ k.transpose(0, 1, 3, 2) * scale
+                    weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+                    weights = weights / cp.sum(weights, axis=-1, keepdims=True)
+                    _ = weights @ v
+                end.record()
+                end.synchronize()
 
-            elapsed_ms = cp.cuda.get_elapsed_time(start, end)
-            times.append(elapsed_ms / iterations)
+                elapsed_ms = cp.cuda.get_elapsed_time(start, end)
+                times.append(elapsed_ms / iterations)
+        except cp.cuda.memory.OutOfMemoryError as exc:
+            results[str(seq_len)] = {"error": f"OOM during attention compute for seq_len={seq_len}: {exc}"}
+            continue
+        except Exception as exc:
+            results[str(seq_len)] = {"error": f"attention compute failed for seq_len={seq_len}: {exc}"}
+            continue
 
         avg_ms = float(np.mean(times))
 
-        # FLOPS: Q@K^T (2*B*H*S*D*S) + softmax (O(S*S)) + W@V (2*B*H*S*D*S)
         flops_qk = 2.0 * batch_size * n_heads * seq_len * head_dim * seq_len
-        flops_softmax = batch_size * n_heads * seq_len * seq_len * 3  # exp + max + sum
+        flops_softmax = batch_size * n_heads * seq_len * seq_len * 3
         flops_wv = 2.0 * batch_size * n_heads * seq_len * head_dim * seq_len
         total_flops = flops_qk + flops_softmax + flops_wv
         tflops = total_flops / (avg_ms / 1000.0 * 1e12)
@@ -289,12 +349,23 @@ def main() -> None:
     gpu_info = get_gpu_info(args.gpu)
 
     all_results: dict[str, Any] = {}
+    pool = cp.get_default_memory_pool()
+
     for kernel_name in kernels:
         bench_fn = KERNEL_MAP.get(kernel_name)
         if bench_fn is None:
             all_results[kernel_name] = {"error": f"unknown kernel '{kernel_name}'"}
             continue
-        all_results[kernel_name] = bench_fn(args.gpu, sizes, args.iterations, args.precision, args.batch_size)
+        # Free memory pool between different kernels to reduce fragmentation
+        pool.free_all_blocks()
+        try:
+            all_results[kernel_name] = bench_fn(
+                args.gpu, sizes, args.iterations, args.precision, args.batch_size,
+            )
+        except cp.cuda.memory.OutOfMemoryError as exc:
+            all_results[kernel_name] = {"error": f"GPU out of memory: {exc}"}
+        except Exception as exc:
+            all_results[kernel_name] = {"error": f"{type(exc).__name__}: {exc}"}
 
     output_json({
         "benchmark": "custom",

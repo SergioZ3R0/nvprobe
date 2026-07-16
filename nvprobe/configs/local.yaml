@@ -36,13 +36,13 @@ benchmarks:
   - name: hpl
     enabled: true
     params:
-      problem_sizes: [1024, 2048]
+      problem_sizes: [4096, 8192]
       binary: "~/.nvprobe/tools/xhpl"
 
   - name: hpcg
     enabled: true
     params:
-      grid_sizes: [64, 128]
+      grid_sizes: [128, 256]
       binary: "~/.nvprobe/tools/xhpcg"
 
   - name: mlperf

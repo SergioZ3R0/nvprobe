@@ -58,6 +58,23 @@ class MlperfBenchmark(BaseBenchmark):
 
     name = "mlperf"
 
+    def _build_cmd(self, mlperf_cmd: str, scenario: str, **kwargs) -> list[str]:
+        cmd_name = os.path.basename(mlperf_cmd)
+        mode = kwargs.get("mode", "test")
+        if mode == "find_performance":
+            mode_suffix = ",_find-performance"
+        elif mode == "full":
+            mode_suffix = ",_find-performance,_full"
+        else:
+            mode_suffix = ""
+
+        if cmd_name in ("cr", "mlcr"):
+            base = [mlperf_cmd, f"run-mlperf,inference{mode_suffix}"]
+        else:
+            base = [mlperf_cmd, "run", f"run-mlperf,inference{mode_suffix}"]
+
+        return base
+
     def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
         model = self.params.get("model", "resnet50")
         framework = self.params.get("framework", "onnxruntime")
@@ -65,6 +82,8 @@ class MlperfBenchmark(BaseBenchmark):
         category = self.params.get("category", "edge")
         implementation = self.params.get("implementation", "reference")
         test_query_count = self.params.get("test_query_count", 100)
+        mode = self.params.get("mode", "test")
+        custom_batch_size = self.params.get("batch_size")
 
         mlperf_cmd = _find_mlperf_cmd()
         if not mlperf_cmd:
@@ -77,35 +96,20 @@ class MlperfBenchmark(BaseBenchmark):
 
         _ensure_mlperf_deps()
 
-        cmd_name = os.path.basename(mlperf_cmd)
-
-        if cmd_name in ("cr", "mlcr"):
-            cmd = [
-                mlperf_cmd, "run-mlperf,inference",
-                f"--model={model}",
-                f"--implementation={implementation}",
-                f"--framework={framework}",
-                f"--category={category}",
-                f"--scenario={scenario}",
-                "--execution_mode=test",
-                "--device=cuda",
-                f"--test_query_count={test_query_count}",
-                "--quiet",
-            ]
-        else:
-            cmd = [
-                mlperf_cmd, "run",
-                "run-mlperf,inference",
-                f"--model={model}",
-                f"--implementation={implementation}",
-                f"--framework={framework}",
-                f"--category={category}",
-                f"--scenario={scenario}",
-                "--execution_mode=test",
-                "--device=cuda",
-                f"--test_query_count={test_query_count}",
-                "--quiet",
-            ]
+        cmd = self._build_cmd(mlperf_cmd, scenario, mode=mode)
+        cmd.extend([
+            f"--model={model}",
+            f"--implementation={implementation}",
+            f"--framework={framework}",
+            f"--category={category}",
+            f"--scenario={scenario}",
+            f"--execution_mode={mode}",
+            "--device=cuda",
+            f"--test_query_count={test_query_count}",
+            "--quiet",
+        ])
+        if custom_batch_size is not None:
+            cmd.append(f"--batch_size={custom_batch_size}")
 
         env = subprocess_env()
         env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
@@ -172,13 +176,24 @@ class MlperfBenchmark(BaseBenchmark):
         category = self.params.get("category", "edge")
         implementation = self.params.get("implementation", "reference")
         test_query_count = self.params.get("test_query_count", 100)
+        mode = self.params.get("mode", "test")
+        custom_batch_size = self.params.get("batch_size")
 
         mlperf_cmd = _find_mlperf_cmd()
         cmd_name = os.path.basename(mlperf_cmd) if mlperf_cmd else "cr"
+        mode_suffix = ""
+        if mode == "find_performance":
+            mode_suffix = ",_find-performance"
+        elif mode == "full":
+            mode_suffix = ",_find-performance,_full"
         if cmd_name in ("cr", "mlcr"):
-            mlperf_line = f"{cmd_name} run-mlperf,inference \\"
+            mlperf_line = f"{cmd_name} run-mlperf,inference{mode_suffix} \\"
         else:
-            mlperf_line = f"{cmd_name} run \\"
+            mlperf_line = f"{cmd_name} run run-mlperf,inference{mode_suffix} \\"
+
+        batch_line = ""
+        if custom_batch_size is not None:
+            batch_line = f"    --batch_size={custom_batch_size} \\\n"
 
         return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
@@ -190,8 +205,8 @@ pip install --user loguru 2>/dev/null || true
     --framework={framework} \\
     --category={category} \\
     --scenario={scenario} \\
-    --execution_mode=test \\
+    --execution_mode={mode} \\
     --device=cuda \\
     --test_query_count={test_query_count} \\
-    --quiet
+{batch_line}    --quiet
 """

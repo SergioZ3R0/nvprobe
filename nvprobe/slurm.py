@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
@@ -21,13 +22,17 @@ class SlurmJob:
     gpu_index: int
     precision: str
     batch_size: int
-    script_path: Path
-    output_path: Path | None = None
+    script_path: str
+    output_path: str | None = None
     status: str = "pending"
 
 
 class SlurmManager:
-    """Manages Slurm job lifecycle: generate, submit, monitor, collect."""
+    """Manages Slurm job lifecycle: generate, submit, monitor, collect.
+
+    Job state is persisted to a JSON file so submit/monitor/collect
+    work across separate CLI invocations.
+    """
 
     def __init__(self, config: RunConfig, output_dir: Path) -> None:
         self.config = config
@@ -36,7 +41,10 @@ class SlurmManager:
         self.jobs_dir = output_dir / "slurm_jobs"
         self.scripts_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
-        self._jobs: list[SlurmJob] = []
+        self._jobs_file = self.jobs_dir / "jobs.json"
+        self._jobs = self._load_jobs()
+
+    # --- Public API ---
 
     def generate_scripts(self) -> list[Path]:
         """Generate sbatch scripts for all enabled benchmarks x configs."""
@@ -82,12 +90,14 @@ class SlurmManager:
             if job:
                 self._jobs.append(job)
 
+        self._save_jobs()
         print(f"Submitted {len(self._jobs)} jobs")
         return self._jobs
 
     def monitor(self, poll_interval: int = 30) -> None:
         """Poll Slurm until all jobs complete."""
         if not self._jobs:
+            print("No jobs to monitor.")
             return
 
         print(f"Monitoring {len(self._jobs)} jobs (poll every {poll_interval}s)...")
@@ -103,14 +113,16 @@ class SlurmManager:
             time.sleep(poll_interval)
 
         self._update_job_statuses()
+        self._save_jobs()
 
     def collect_results(self) -> dict[str, Any]:
         """Collect output from completed jobs."""
         results: dict[str, Any] = {}
 
         for job in self._jobs:
-            if job.output_path and job.output_path.exists():
-                output = job.output_path.read_text(encoding="utf-8")
+            out_path = Path(job.output_path) if job.output_path else None
+            if out_path and out_path.exists():
+                output = out_path.read_text(encoding="utf-8")
                 key = f"{job.benchmark}_gpu{job.gpu_index}_{job.precision}_bs{job.batch_size}"
                 results[key] = {
                     "job_id": job.job_id,
@@ -123,6 +135,25 @@ class SlurmManager:
                 }
 
         return results
+
+    # --- Job persistence ---
+
+    def _load_jobs(self) -> list[SlurmJob]:
+        """Load jobs from disk if the file exists."""
+        if self._jobs_file and self._jobs_file.exists():
+            try:
+                data = json.loads(self._jobs_file.read_text(encoding="utf-8"))
+                return [SlurmJob(**j) for j in data]
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                print(f"WARNING: could not load jobs file: {exc}")
+        return []
+
+    def _save_jobs(self) -> None:
+        """Save all jobs to disk."""
+        data = [asdict(j) for j in self._jobs]
+        self._jobs_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # --- Internal helpers ---
 
     def _build_header(self, benchmark: str, gpu_index: int, precision: str, batch_size: int) -> str:
         """Build Slurm SBATCH header from config."""
@@ -172,19 +203,19 @@ class SlurmManager:
                 ["sbatch", str(script_path)],
                 capture_output=True, text=True, check=True,
             )
-            # sbatch output: "Submitted batch job 12345"
             job_id = proc.stdout.strip().split()[-1]
             parts = script_path.stem.split("_")
-            # Build the job_name exactly as _build_header does
             job_name = f"nvprobe-{parts[0]}-gpu{parts[1].replace('gpu', '')}-{parts[2]}-bs{parts[3].replace('bs', '')}"
+            script_path_str = str(script_path)
+            output_path_str = str(self.jobs_dir / f"{job_name}_{job_id}.out")
             return SlurmJob(
                 job_id=job_id,
                 benchmark=parts[0],
                 gpu_index=int(parts[1].replace("gpu", "")),
                 precision=parts[2],
                 batch_size=int(parts[3].replace("bs", "")),
-                script_path=script_path,
-                output_path=self.jobs_dir / f"{job_name}_{job_id}.out",
+                script_path=script_path_str,
+                output_path=output_path_str,
             )
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
             print(f"WARNING: failed to submit {script_path.name}: {exc}")

@@ -195,8 +195,12 @@ def _measure_latency(gpu_index: int, n_elements: int, n_runs: int) -> dict[str, 
         if indices_size < stride:
             continue
 
-        # Build chase chain: indices[i] = (i + stride) % indices_size
-        indices_host = np.arange(indices_size, dtype=np.int32)
+        # Build chase chain: each element i points to (i + stride) % indices_size
+        # This creates a closed cycle of length indices_size // stride,
+        # forcing random-access DRAM latency (not L1 cache hits).
+        indices_host = np.zeros(indices_size, dtype=np.int32)
+        for i in range(indices_size):
+            indices_host[i] = (i + stride) % indices_size
         indices_device = cp.array(indices_host)
 
         # Warmup: follow chain a few times
