@@ -202,24 +202,8 @@ def _do_setup_tools(force: bool = False) -> None:
         import mlperf_inference  # noqa: F401
         console.print("[dim]MLPerf already installed[/dim]")
     except ImportError:
-        console.print("[bold]Installing MLPerf Inference...[/bold]")
-        # Find a Python with pip access (sys.executable may be a restricted shared Python)
-        python_cmd = sys.executable
-        for candidate in ["python3", "python3.11", "python3.10"]:
-            import shutil as _shutil
-            path = _shutil.which(candidate)
-            if path and path != sys.executable:
-                python_cmd = path
-                break
-        try:
-            subprocess.run(
-                [python_cmd, "-m", "pip", "install", "--user", "mlperf-inference"],
-                check=True, capture_output=True,
-            )
-            console.print("  [green]mlperf-inference installed[/green]")
-        except Exception as exc:
-            console.print(f"  [yellow]MLPerf install failed: {exc}[/yellow]")
-            console.print("  [dim]Try manually: pip install --user mlperf-inference[/dim]")
+        console.print("[dim]MLPerf not installed (optional)[/dim]")
+        console.print("  [dim]To enable: pip install cmx4mlperf[/dim]")
 
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")

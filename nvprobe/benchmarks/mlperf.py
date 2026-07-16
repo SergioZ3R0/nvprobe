@@ -27,8 +27,7 @@ class MlperfBenchmark(BaseBenchmark):
                 benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False, error=(
-                    "mlperf-inference not installed. "
-                    "Run 'pip install --user mlperf-inference' to enable."
+                    "MLPerf not installed. Install with: pip install cmx4mlperf"
                 ),
             )
 
