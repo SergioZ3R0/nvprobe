@@ -38,11 +38,18 @@ def run_bandwidth_test(
     }
     cupy_dtype = cp.dtype(dtype_map.get(precision, cp.float32))
 
+    np_dtype_map = {
+        "fp32": np.float32,
+        "fp16": np.float16,
+        "int8": np.int8,
+    }
+    numpy_dtype = np_dtype_map.get(precision, np.float32)
+
     results: dict[str, Any] = {"h2d": {}, "d2h": {}, "d2d": {}}
 
     for size_mb in sizes_mb:
         n_elements = (size_mb * 1024 * 1024) // cupy_dtype.itemsize
-        host_data = np.ones(n_elements, dtype=np.float32)
+        host_data = np.ones(n_elements, dtype=numpy_dtype)
         device_data = cp.empty(n_elements, dtype=cupy_dtype)
 
         # Warmup

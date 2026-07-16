@@ -105,7 +105,8 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
         # Warmup
         for _ in range(min(5, iterations)):
             scores = q @ k.transpose(0, 2, 1) * scale
-            weights = cp.softmax(scores, axis=-1)
+            weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+            weights = weights / cp.sum(weights, axis=-1, keepdims=True)
             _ = weights @ v
         cp.cuda.Stream.null.synchronize()
 
@@ -114,7 +115,8 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
         start.record()
         for _ in range(iterations):
             scores = q @ k.transpose(0, 2, 1) * scale
-            weights = cp.softmax(scores, axis=-1)
+            weights = cp.exp(scores - cp.max(scores, axis=-1, keepdims=True))
+            weights = weights / cp.sum(weights, axis=-1, keepdims=True)
             _ = weights @ v
         end.record()
         end.synchronize()
