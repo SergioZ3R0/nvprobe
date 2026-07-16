@@ -65,23 +65,9 @@ class MlperfBenchmark(BaseBenchmark):
 
         cmd_name = os.path.basename(mlperf_cmd)
 
-        if cmd_name == "cr":
+        if cmd_name in ("cr", "mlcr"):
             cmd = [
                 mlperf_cmd, "run-mlperf,inference",
-                f"--model={model}",
-                f"--implementation={implementation}",
-                f"--framework={framework}",
-                f"--category={category}",
-                f"--scenario={scenario}",
-                "--execution_mode=test",
-                "--device=cuda",
-                f"--test_query_count={test_query_count}",
-                "--quiet",
-            ]
-        elif cmd_name == "cmx":
-            cmd = [
-                mlperf_cmd, "run", "script",
-                "run-mlperf,inference",
                 f"--model={model}",
                 f"--implementation={implementation}",
                 f"--framework={framework}",
@@ -95,7 +81,7 @@ class MlperfBenchmark(BaseBenchmark):
         else:
             cmd = [
                 mlperf_cmd, "run",
-                "app,mlperf,inference,generic",
+                "run-mlperf,inference",
                 f"--model={model}",
                 f"--implementation={implementation}",
                 f"--framework={framework}",
