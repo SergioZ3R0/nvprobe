@@ -26,7 +26,7 @@ def run(
         exists=True, dir_okay=False, readable=True,
     ),
     output: Path = typer.Option(
-        Path("results"), "--output", "-o", help="Directory for raw results (JSON/CSV).",
+        Path("nvprobe/results"), "--output", "-o", help="Directory for raw results (JSON/CSV).",
     ),
     local: bool = typer.Option(
         False, "--local", "-l", help="Run locally on this machine (no Slurm).",
@@ -51,10 +51,10 @@ def run(
 @app.command()
 def report(
     results: Path = typer.Option(
-        Path("results"), "--results", "-r", help="Directory containing benchmark results.",
+        Path("nvprobe/results"), "--results", "-r", help="Directory containing benchmark results.",
     ),
     output: Path = typer.Option(
-        Path("reports"), "--output", "-o", help="Directory for generated HTML reports.",
+        Path("nvprobe/reports"), "--output", "-o", help="Directory for generated HTML reports.",
     ),
     title: Optional[str] = typer.Option(
         None, "--title", "-t", help="Report title.",
@@ -72,7 +72,7 @@ def compare(
     results_a: Path = typer.Option(..., "--a", help="First result set (baseline)."),
     results_b: Path = typer.Option(..., "--b", help="Second result set (comparison)."),
     output: Path = typer.Option(
-        Path("reports"), "--output", "-o", help="Directory for comparison report.",
+        Path("nvprobe/reports"), "--output", "-o", help="Directory for comparison report.",
     ),
 ) -> None:
     """Compare two result sets side-by-side."""
@@ -103,18 +103,19 @@ def version() -> None:
 # ---------------------------------------------------------------------------
 
 def _do_init(force: bool = False) -> None:
-    """Generate default config files in the current directory."""
+    """Generate default config files under nvprobe/ working directory."""
     import shutil as _shutil
 
-    configs_dir = Path(__file__).parent / "configs"
-    dest = Path("configs")
+    configs_src = Path(__file__).parent / "configs"
+    base = Path("nvprobe")
+    dest = base / "configs"
 
     if dest.exists() and not force:
-        console.print(f"[yellow]configs/ already exists. Use --force to overwrite.[/yellow]")
+        console.print(f"[yellow]nvprobe/configs/ already exists. Use --force to overwrite.[/yellow]")
         return
 
     dest.mkdir(parents=True, exist_ok=True)
-    for src in configs_dir.glob("*.yaml"):
+    for src in configs_src.glob("*.yaml"):
         dst = dest / src.name
         if dst.exists() and not force:
             console.print(f"  [dim]skip {dst.name}[/dim]")
@@ -122,9 +123,17 @@ def _do_init(force: bool = False) -> None:
             _shutil.copy2(src, dst)
             console.print(f"  [green]{dst}[/green]")
 
-    console.print(f"\n[green]Configs written to {dest}/[/green]")
-    console.print("Edit [bold]configs/local.yaml[/bold] then run:")
-    console.print("  nvprobe run --config configs/local.yaml --local")
+    # Create results and reports directories
+    (base / "results").mkdir(exist_ok=True)
+    (base / "reports").mkdir(exist_ok=True)
+
+    console.print(f"\n[green]Project structure created in {base}/[/green]")
+    console.print(f"  {base}/configs/   — YAML config files")
+    console.print(f"  {base}/results/   — benchmark results (SQLite, CSV, JSON)")
+    console.print(f"  {base}/reports/   — HTML reports + logo")
+    console.print()
+    console.print("Edit [bold]nvprobe/configs/local.yaml[/bold] then run:")
+    console.print("  nvprobe run --config nvprobe/configs/local.yaml --local")
 
 
 def _do_setup_tools(force: bool = False) -> None:
@@ -314,7 +323,7 @@ def slurm_cmd(
         exists=True, dir_okay=False, readable=True,
     ),
     output: Path = typer.Option(
-        Path("results"), "--output", "-o", help="Output directory.",
+        Path("nvprobe/results"), "--output", "-o", help="Output directory.",
     ),
     action: str = typer.Option(
         "generate", "--action", "-a",

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="reports/nvprobe.svg" alt="nvProbe logo" width="200">
+  <img src="https://raw.githubusercontent.com/SergioZ3R0/nvprobe/main/nvprobe/nvprobe.svg" alt="nvProbe logo" width="200">
 </p>
 
 # nvProbe: NVIDIA GPU & CUDA Benchmark Suite
@@ -23,8 +23,8 @@ nvProbe runs standardized benchmarks across your GPU fleet, captures environment
 
 ```bash
 pip install nvprobe
-nvprobe init                    # generates configs/ with default YAML files
-nvprobe run --config configs/local.yaml --local
+nvprobe setup                      # install cupy + HPL/HPCG + generate configs
+nvprobe run --config nvprobe/configs/local.yaml --local
 ```
 
 ### Or install from source
@@ -33,7 +33,7 @@ nvprobe run --config configs/local.yaml --local
 git clone https://github.com/SergioZ3R0/nvprobe.git
 cd nvprobe
 pip install -e .
-make setup                      # installs nvprobe + self-contained CuPy
+nvprobe setup                      # installs nvprobe + self-contained CuPy
 nvprobe run --config nvprobe/configs/local.yaml --local
 ```
 

@@ -222,6 +222,14 @@ def generate_report(
     html = _render_html(report_title, latest_run, results, env_info, charts)
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy logo to reports directory
+    logo_src = Path(__file__).parent / "nvprobe.svg"
+    logo_dst = output_dir / "nvprobe.svg"
+    if logo_src.exists():
+        import shutil
+        shutil.copy2(logo_src, logo_dst)
+
     report_path = output_dir / "report.html"
     report_path.write_text(html, encoding="utf-8")
 
@@ -360,6 +368,7 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
 <body>
 <nav class="sidebar">
     <div class="sidebar-header">
+        <img src="nvprobe.svg" alt="nvProbe" style="width:80px;margin-bottom:0.5rem;">
         <div class="sidebar-title">nvProbe</div>
         <div class="sidebar-subtitle">GPU Benchmark Suite</div>
     </div>
