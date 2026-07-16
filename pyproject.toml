@@ -43,9 +43,9 @@ nvprobe = "nvprobe.cli:app"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "ruff>=0.4"]
-cupy-cuda11x = ["cupy-cuda11x>=12.0"]
-cupy-cuda12x = ["cupy-cuda12x>=13.0"]
-cupy-cuda13x = ["cupy-cuda13x>=13.0"]
+cupy-cuda11x = ["cupy-cuda11x[ctk]>=12.0"]
+cupy-cuda12x = ["cupy-cuda12x[ctk]>=13.0"]
+cupy-cuda13x = ["cupy-cuda13x[ctk]>=13.0"]
 
 [tool.setuptools.packages.find]
 include = ["nvprobe*"]

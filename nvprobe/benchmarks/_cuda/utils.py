@@ -14,11 +14,11 @@ def require_cupy():
         return cp
     except ImportError:
         print(
-            "Error: CuPy is not installed.\n"
-            "Install the correct version for your CUDA toolkit:\n"
-            "  CUDA 13.x: pip install cupy-cuda13x\n"
-            "  CUDA 12.x: pip install cupy-cuda12x\n"
-            "  CUDA 11.x: pip install cupy-cuda11x\n"
+            "Error: CuPy is not installed or missing CUDA libraries.\n"
+            "Install the self-contained version for your CUDA toolkit:\n"
+            "  CUDA 13.x: pip install 'cupy-cuda13x[ctk]'\n"
+            "  CUDA 12.x: pip install 'cupy-cuda12x[ctk]'\n"
+            "  CUDA 11.x: pip install 'cupy-cuda11x[ctk]'\n"
             "Or run: make install-cupy",
             file=sys.stderr,
         )
