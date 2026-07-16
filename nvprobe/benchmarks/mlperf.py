@@ -25,6 +25,20 @@ def _find_mlperf_cmd() -> str | None:
     return None
 
 
+_VALID_SCENARIOS = {"offline", "server", "singlestream", "multistream"}
+_SCENARIO_ALIASES = {"inference": "offline", "perf": "offline", "default": "offline"}
+
+
+def _normalize_scenario(scenario: str) -> str:
+    """Map common user mistakes to valid MLPerf scenario names."""
+    lower = scenario.lower().strip()
+    if lower in _SCENARIO_ALIASES:
+        return _SCENARIO_ALIASES[lower].capitalize()
+    if lower in _VALID_SCENARIOS:
+        return scenario.capitalize()
+    return scenario  # pass through, mlcr will report the error
+
+
 def _ensure_mlperf_deps() -> None:
     """Pre-install dependencies cr needs but can't install itself (no root)."""
     deps = ["loguru"]
@@ -47,7 +61,7 @@ class MlperfBenchmark(BaseBenchmark):
     def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
         model = self.params.get("model", "resnet50")
         framework = self.params.get("framework", "onnxruntime")
-        scenario = self.params.get("scenario", "Offline")
+        scenario = _normalize_scenario(self.params.get("scenario", "Offline"))
         category = self.params.get("category", "edge")
         implementation = self.params.get("implementation", "reference")
         test_query_count = self.params.get("test_query_count", 100)
@@ -139,7 +153,7 @@ class MlperfBenchmark(BaseBenchmark):
         """Return shell commands for this benchmark (without SBATCH headers)."""
         model = self.params.get("model", "resnet50")
         framework = self.params.get("framework", "onnxruntime")
-        scenario = self.params.get("scenario", "Offline")
+        scenario = _normalize_scenario(self.params.get("scenario", "Offline"))
         category = self.params.get("category", "edge")
         implementation = self.params.get("implementation", "reference")
         test_query_count = self.params.get("test_query_count", 100)
