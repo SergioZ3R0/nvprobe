@@ -49,3 +49,6 @@ cupy-cuda13x = ["cupy-cuda13x[ctk]>=13.0"]
 
 [tool.setuptools.packages.find]
 include = ["nvprobe*"]
+
+[tool.setuptools.package-data]
+nvprobe = ["configs/*.yaml"]

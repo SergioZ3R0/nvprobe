@@ -22,15 +22,19 @@ nvProbe runs standardized benchmarks across your GPU fleet, captures environment
 ## Quick Start
 
 ```bash
+pip install nvprobe
+nvprobe init                    # generates configs/ with default YAML files
+nvprobe run --config configs/local.yaml --local
+```
+
+### Or install from source
+
+```bash
 git clone https://github.com/SergioZ3R0/nvprobe.git
 cd nvprobe
 pip install -e .
-```
-
-### Or install from PyPI
-
-```bash
-pip install nvprobe
+make setup                      # installs nvprobe + self-contained CuPy
+nvprobe run --config nvprobe/configs/local.yaml --local
 ```
 
 ### Detect GPU environment

@@ -47,19 +47,19 @@ format:
 	ruff format nvprobe/
 
 run:
-	python -m nvprobe.cli run --config configs/default.yaml
+	python -m nvprobe.cli run --config nvprobe/configs/default.yaml
 
 dry-run:
-	python -m nvprobe.cli run --config configs/default.yaml --dry-run
+	python -m nvprobe.cli run --config nvprobe/configs/default.yaml --dry-run
 
 slurm-generate:
-	python -m nvprobe.cli slurm --config configs/default.yaml --action generate
+	python -m nvprobe.cli slurm --config nvprobe/configs/default.yaml --action generate
 
 slurm-submit:
-	python -m nvprobe.cli slurm --config configs/default.yaml --action submit
+	python -m nvprobe.cli slurm --config nvprobe/configs/default.yaml --action submit
 
 slurm-monitor:
-	python -m nvprobe.cli slurm --config configs/default.yaml --action monitor
+	python -m nvprobe.cli slurm --config nvprobe/configs/default.yaml --action monitor
 
 report:
 	python -m nvprobe.cli report

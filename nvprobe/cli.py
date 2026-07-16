@@ -97,6 +97,34 @@ def version() -> None:
     console.print(f"nvprobe {__version__}")
 
 
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing configs."),
+) -> None:
+    """Generate default config files in the current directory."""
+    import shutil
+
+    configs_dir = Path(__file__).parent / "configs"
+    dest = Path("configs")
+
+    if dest.exists() and not force:
+        console.print(f"[yellow]configs/ already exists. Use --force to overwrite.[/yellow]")
+        return
+
+    dest.mkdir(parents=True, exist_ok=True)
+    for src in configs_dir.glob("*.yaml"):
+        dst = dest / src.name
+        if dst.exists() and not force:
+            console.print(f"  [dim]skip {dst.name}[/dim]")
+        else:
+            shutil.copy2(src, dst)
+            console.print(f"  [green]{dst}[/green]")
+
+    console.print(f"\n[green]Configs written to {dest}/[/green]")
+    console.print("Edit [bold]configs/local.yaml[/bold] then run:")
+    console.print("  nvprobe run --config configs/local.yaml --local")
+
+
 @app.command(name="slurm")
 def slurm_cmd(
     config: Path = typer.Option(
