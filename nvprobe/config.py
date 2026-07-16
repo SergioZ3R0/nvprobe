@@ -9,6 +9,13 @@ from typing import Any
 import yaml
 
 
+def _expand_user(val: Any) -> Any:
+    """Expand ~ in string values."""
+    if isinstance(val, str):
+        return str(Path(val).expanduser())
+    return val
+
+
 @dataclass
 class BenchmarkConfig:
     """A single benchmark to run."""
@@ -84,10 +91,11 @@ def _parse_config(raw: dict[str, Any]) -> RunConfig:
 
     benchmarks = []
     for b in raw.get("benchmarks", []):
+        params = {_expand_user(k): _expand_user(v) for k, v in b.get("params", {}).items()}
         benchmarks.append(BenchmarkConfig(
             name=b["name"],
             enabled=b.get("enabled", True),
-            params=b.get("params", {}),
+            params=params,
         ))
 
     return RunConfig(

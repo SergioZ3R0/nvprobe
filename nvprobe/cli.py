@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -125,7 +126,72 @@ def init(
     console.print("  nvprobe run --config configs/local.yaml --local")
 
 
-@app.command(name="slurm")
+@app.command()
+def setup_tools(
+    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already installed."),
+) -> None:
+    """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
+    import platform
+    import shutil
+    import subprocess
+    import urllib.request
+
+    tools_dir = Path.home() / ".nvprobe" / "tools"
+    tools_dir.mkdir(parents=True, exist_ok=True)
+
+    arch = "x86_64" if platform.machine() == "x86_64" else "aarch64"
+
+    # --- HPL ---
+    hpl_bin = tools_dir / "xhpl"
+    if hpl_bin.exists() and not force:
+        console.print(f"[dim]HPL already installed: {hpl_bin}[/dim]")
+    else:
+        console.print("[bold]Installing HPL...[/bold]")
+        try:
+            url = f"https://github.com/SergioZ3R0/nvprobe-tools/releases/latest/download/xhpl-{arch}"
+            urllib.request.urlretrieve(url, hpl_bin)
+            hpl_bin.chmod(0o755)
+            console.print(f"  [green]{hpl_bin}[/green]")
+        except Exception as exc:
+            console.print(f"  [yellow]HPL download failed: {exc}[/yellow]")
+            console.print("  [dim]Build from source: https://www.netlib.org/benchmark/hpl/[/dim]")
+
+    # --- HPCG ---
+    hpcg_bin = tools_dir / "xhpcg"
+    if hpcg_bin.exists() and not force:
+        console.print(f"[dim]HPCG already installed: {hpcg_bin}[/dim]")
+    else:
+        console.print("[bold]Installing HPCG...[/bold]")
+        try:
+            url = f"https://github.com/SergioZ3R0/nvprobe-tools/releases/latest/download/xhpcg-{arch}"
+            urllib.request.urlretrieve(url, hpcg_bin)
+            hpcg_bin.chmod(0o755)
+            console.print(f"  [green]{hpcg_bin}[/green]")
+        except Exception as exc:
+            console.print(f"  [yellow]HPCG download failed: {exc}[/yellow]")
+            console.print("  [dim]Build from source: https://github.com/hpcg-benchmark/hpcg[/dim]")
+
+    # --- MLPerf ---
+    try:
+        import mlperf_inference  # noqa: F401
+        console.print("[dim]MLPerf already installed[/dim]")
+    except ImportError:
+        console.print("[bold]Installing MLPerf Inference...[/bold]")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--user", "mlperf-inference"],
+                check=True, capture_output=True,
+            )
+            console.print("  [green]mlperf-inference installed[/green]")
+        except Exception as exc:
+            console.print(f"  [yellow]MLPerf install failed: {exc}[/yellow]")
+
+    # --- Update PATH ---
+    path_add = str(tools_dir)
+    console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
+    console.print("Add to your shell profile:")
+    console.print(f'  export PATH="{path_add}:$PATH"')
+    console.print("Or run benchmarks with 'binary' param pointing to the full path.")
 def slurm_cmd(
     config: Path = typer.Option(
         ..., "--config", "-c", help="YAML config file.",

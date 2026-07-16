@@ -50,17 +50,17 @@ benchmarks:
     enabled: true
     params:
       problem_sizes: [1024, 2048, 4096]
-      # HPL binary path (must be pre-installed on the cluster)
-      binary: "xhpl"
+      # Binary from nvprobe setup-tools, or system PATH
+      binary: "~/.nvprobe/tools/xhpl"
 
   - name: hpcg
     enabled: true
     params:
       grid_sizes: [64, 128, 256]
-      binary: "xhpcg"
+      binary: "~/.nvprobe/tools/xhpcg"
 
   - name: mlperf
-    enabled: false    # requires MLPerf suite installation
+    enabled: false    # run 'nvprobe setup-tools' to install
     params:
       scenario: inference
       mode: performance

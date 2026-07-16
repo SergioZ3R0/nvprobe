@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -17,6 +18,14 @@ class HpcgBenchmark(BaseBenchmark):
     def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
         binary = self.params.get("binary", "xhpcg")
         grid_sizes = self.params.get("grid_sizes", [128])
+
+        if not shutil.which(binary):
+            return BenchmarkResult(
+                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                precision=precision, batch_size=batch_size,
+                success=False,
+                error=f"HPCG binary '{binary}' not found. Run 'nvprobe setup-tools' or install xhpcg.",
+            )
 
         try:
             proc = subprocess.run(
