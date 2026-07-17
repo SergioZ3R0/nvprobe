@@ -204,6 +204,8 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
     import tempfile
     import urllib.request
 
+    from nvprobe.benchmarks.base import _ensure_pip_package
+
     # Auto-detect CUDA version if not provided
     if cuda_version is None:
         cuda_version = _detect_cuda_major() or "12"
@@ -315,6 +317,24 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
         else:
             console.print("[dim]MLPerf not installed (optional)[/dim]")
             console.print("  [dim]To enable: pip install --user cmx4mlperf[/dim]")
+
+    # --- Step: Auto-install NCCL (best-effort) ---
+    nccl_pkg = f"nvidia-nccl-cu{cuda_version}"
+    console.print(f"\n[bold]Step: NCCL runtime library[/bold]")
+    if _ensure_pip_package(nccl_pkg):
+        console.print(f"  [green]{nccl_pkg} ready[/green]")
+    else:
+        console.print(f"  [yellow]Could not install {nccl_pkg}[/yellow]")
+        console.print(f"  [dim]To install manually: pip install --user {nccl_pkg}[/dim]")
+
+    # --- Step: Auto-install cuDNN (best-effort) ---
+    cudnn_pkg = f"nvidia-cudnn-cu{cuda_version}"
+    console.print(f"\n[bold]Step: cuDNN runtime library[/bold]")
+    if _ensure_pip_package(cudnn_pkg):
+        console.print(f"  [green]{cudnn_pkg} ready[/green]")
+    else:
+        console.print(f"  [yellow]Could not install {cudnn_pkg}[/yellow]")
+        console.print(f"  [dim]To install manually: pip install --user {cudnn_pkg}[/dim]")
 
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")

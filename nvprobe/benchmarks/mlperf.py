@@ -5,10 +5,12 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 from typing import Any
 
-from nvprobe.benchmarks.base import BaseBenchmark, BenchmarkResult, subprocess_env
+from nvprobe.benchmarks.base import (
+    BaseBenchmark, BenchmarkResult, _ensure_pip_package,
+    _find_cudnn_root, subprocess_env,
+)
 
 
 def _find_mlperf_cmd() -> str | None:
@@ -41,16 +43,7 @@ def _normalize_scenario(scenario: str) -> str:
 
 def _ensure_mlperf_deps() -> None:
     """Pre-install dependencies cr needs but can't install itself (no root)."""
-    deps = ["loguru"]
-    env = subprocess_env()
-    for pkg in deps:
-        try:
-            __import__(pkg)
-        except ImportError:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--user", pkg],
-                capture_output=True, timeout=60, env=env,
-            )
+    _ensure_pip_package("loguru")
 
 
 class MlperfBenchmark(BaseBenchmark):
@@ -113,6 +106,10 @@ class MlperfBenchmark(BaseBenchmark):
 
         env = subprocess_env()
         env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+        # Point mlcr to pip-installed cuDNN if available
+        cudnn_root = _find_cudnn_root()
+        if cudnn_root:
+            env["CUDNN_ROOT"] = cudnn_root
 
         try:
             proc = subprocess.run(
@@ -153,10 +150,18 @@ class MlperfBenchmark(BaseBenchmark):
             detail = "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
 
             if "cudnn" in detail.lower() or "cudnn" in stderr.lower():
+                cuda_ver = "13"
+                try:
+                    from nvprobe.benchmarks.base import _guess_cuda_major
+                    cuda_ver = _guess_cuda_major()
+                except Exception:
+                    pass
+                pip_cmd = f"pip install --user nvidia-cudnn-cu{cuda_ver}"
                 detail = (
-                    "cuDNN not found. Install cuDNN locally:\n"
-                    "  1. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
-                    "  2. mlcr get,nvidia,cudnn --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
+                    "cuDNN not found. Install cuDNN:\n"
+                    f"  1. (recommended) {pip_cmd}\n"
+                    "  2. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
+                    "     then: mlcr get,nvidia,cudnn --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
                     "  Or set CUDNN_ROOT to an existing cuDNN installation."
                 )
             elif "Permission denied" in detail:

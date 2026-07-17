@@ -168,6 +168,123 @@ def _find_nccl_libs() -> list[str]:
     return dirs
 
 
+def _find_cudnn_libs() -> list[str]:
+    """Find cuDNN library directories (pip-installed nvidia-cudnn-cuXX or system)."""
+    dirs: list[str] = []
+
+    # 1. Check pip-installed nvidia-cudnn-cuXX package
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith("nvidia-cudnn-cu"):
+                try:
+                    loc = dist.locate_file("").parent
+                except Exception:
+                    loc = dist._path.parent
+                cudnn_lib = str(loc / "nvidia" / "cudnn" / "lib")
+                if os.path.isdir(cudnn_lib) and cudnn_lib not in dirs:
+                    dirs.append(cudnn_lib)
+    except Exception:
+        pass
+
+    # 2. System paths
+    candidates = [
+        "/usr/lib64",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/cuda/lib64",
+        "/usr/local/cuda/compat",
+    ]
+    for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
+        cuda_path = os.environ.get(env_var)
+        if cuda_path:
+            p = os.path.join(cuda_path, "lib64")
+            if p not in candidates:
+                candidates.insert(0, p)
+            p = os.path.join(cuda_path, "compat")
+            if p not in candidates:
+                candidates.insert(0, p)
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        toolkit_base = str(Path(nvcc).parent.parent)
+        for sub in ("lib64", "lib", "compat"):
+            p = os.path.join(toolkit_base, sub)
+            if p not in candidates:
+                candidates.insert(0, p)
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        nvidia_dir = str(Path(nvidia_smi).parent)
+        for sub in ("", "../lib64", "../lib", "../compat"):
+            p = os.path.normpath(os.path.join(nvidia_dir, sub))
+            if p not in candidates:
+                candidates.insert(0, p)
+
+    for path in candidates:
+        p = os.path.realpath(path)
+        if not os.path.isdir(p):
+            continue
+        try:
+            files = os.listdir(p)
+        except OSError:
+            continue
+        if any(f.startswith("libcudnn.so") for f in files):
+            if p not in dirs:
+                dirs.append(p)
+
+    return dirs
+
+
+def _find_cudnn_root() -> str | None:
+    """Return the cuDNN root directory if nvidia-cudnn-cuXX is pip-installed."""
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith("nvidia-cudnn-cu"):
+                try:
+                    loc = dist.locate_file("").parent
+                except Exception:
+                    loc = dist._path.parent
+                root = str(loc / "nvidia" / "cudnn")
+                if os.path.isdir(os.path.join(root, "lib")):
+                    return root
+    except Exception:
+        pass
+    return None
+
+
+def _ensure_pip_package(pip_name: str) -> bool:
+    """Install *pip_name* via ``pip install --user`` if not already present.
+
+    Returns ``True`` if the package was already installed or installed
+    successfully.  Returns ``False`` on any failure (no network, no
+    permissions, etc.) — *never raises*.
+    """
+    import sys
+
+    if not pip_name or not pip_name.strip():
+        return False
+
+    # Check if already installed via importlib.metadata
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.replace("-", "_") == pip_name.replace("-", "_"):
+                return True
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--user", pip_name],
+            capture_output=True, timeout=120,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 # Libraries that NVIDIA HPC benchmark binaries may require at runtime.
 KNOWN_MISSING_LIBS = ("libcublas", "libmpi", "libnccl")
 
@@ -280,6 +397,7 @@ def subprocess_env() -> dict[str, str]:
     cuda_libs.extend(_find_cupy_cuda_libs())
     cuda_libs.extend(_find_system_cuda_libs())
     cuda_libs.extend(_find_nccl_libs())
+    cuda_libs.extend(_find_cudnn_libs())
 
     # Add MPI lib paths (for HPL/HPCG binaries compiled against MPI).
     # Only derive paths from mpirun (NOT srun — srun is the Slurm launcher,
@@ -308,6 +426,11 @@ def subprocess_env() -> dict[str, str]:
             if lib not in existing_parts:
                 existing_parts.insert(0, lib)
         env["LD_LIBRARY_PATH"] = os.pathsep.join(existing_parts)
+
+    # Set CUDNN_ROOT if nvidia-cudnn-cuXX is pip-installed
+    cudnn_root = _find_cudnn_root()
+    if cudnn_root:
+        env["CUDNN_ROOT"] = cudnn_root
 
     return env
 
