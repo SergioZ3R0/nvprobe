@@ -109,13 +109,16 @@ class MlperfBenchmark(BaseBenchmark):
         # Point mlcr to pip-installed cuDNN if available
         cudnn_root = _find_cudnn_root()
         if cudnn_root:
-            # mlcr sanitizes environment for sub-scripts, so pass CUDNN_ROOT
-            # explicitly via its --env. CLI flag (propagates to all dependencies).
-            cmd.append(f"--env.CUDNN_ROOT={cudnn_root}")
+            cudnn_lib = os.path.join(cudnn_root, "lib")
+            cudnn_inc = os.path.join(cudnn_root, "include")
+            if os.path.isdir(cudnn_lib):
+                cmd.append(f"--adr.cuda-cudnn.cudnn_lib_path={cudnn_lib}")
+                cmd.append(f"--adr.cuda-cudnn.cudnn_include_path={cudnn_inc}")
             env["CUDNN_ROOT"] = cudnn_root
-            env["CM_TMP_PATH"] = os.path.join(cudnn_root, "lib")
-            env["CM_CUDA_PATH_LIB_CUDNN"] = os.path.join(cudnn_root, "lib")
+            env["CM_TMP_PATH"] = cudnn_lib
+            env["CM_CUDA_PATH_LIB_CUDNN"] = cudnn_lib
             env["CM_CUDA_PATH_LIB_CUDNN_EXISTS"] = "yes"
+            env["CM_CUDA_PATH_INCLUDE_CUDNN"] = cudnn_inc
 
         try:
             proc = subprocess.run(
@@ -156,25 +159,19 @@ class MlperfBenchmark(BaseBenchmark):
             detail = "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
 
             if "cudnn" in detail.lower() or "cudnn" in stderr.lower():
-                cuda_ver = "13"
-                try:
-                    from nvprobe.benchmarks.base import _guess_cuda_major
-                    cuda_ver = _guess_cuda_major()
-                except Exception:
-                    pass
-                pip_cmd = f"pip install --user nvidia-cudnn-cu{cuda_ver}"
                 detail = (
                     "cuDNN not detected by MLPerf pipeline.\n"
-                    "  mlcr's sub-scripts do not inherit the parent environment,\n"
-                    "  so CUDNN_ROOT and LD_LIBRARY_PATH are not visible to them.\n"
+                    "  mlcr's sub-scripts do not inherit parent environment\n"
+                    "  variables (CUDNN_ROOT, LD_LIBRARY_PATH).\n"
                     "  Options:\n"
-                    f"  1. Install cuDNN system-wide (RPM/deb): {pip_cmd}\n"
-                    "  2. Register cuDNN manually with mlcr:\n"
+                    f"  1. Register pip-installed cuDNN with mlcr:\n"
                     f"       mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')\n"
                     "     Then run 'nvprobe run' again.\n"
-                    "  3. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
+                    "  2. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
                     "     and register it:\n"
-                    f"       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz"
+                    f"       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
+                    "  3. Install cuDNN system-wide (RPM/deb) into the CUDA\n"
+                    "     toolkit directory."
                 )
             elif "Permission denied" in detail:
                 detail += "\n\nFix: pip install --user loguru"

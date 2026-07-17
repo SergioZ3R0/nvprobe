@@ -397,7 +397,6 @@ def generate_report(
         "hpl": _chart_hpl(results),
         "hpcg": _chart_hpcg(results),
         "summary": _chart_summary(results),
-        "gpu_comparison": _chart_gpu_comparison(results),
     }
 
     # Copy logo to reports directory
@@ -481,8 +480,6 @@ def _render_html(
         chart_html += f'<div class="chart"><img src="{charts["hpl"]}" alt="HPL"></div>\n'
     if charts.get("hpcg"):
         chart_html += f'<div class="chart"><img src="{charts["hpcg"]}" alt="HPCG"></div>\n'
-    if charts.get("gpu_comparison"):
-        chart_html += f'<div class="chart"><img src="{charts["gpu_comparison"]}" alt="GPU Comparison"></div>\n'
 
     bench_tables = _render_benchmark_tables(results)
 
