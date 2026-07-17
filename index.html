@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="KKF0cMXH6CdcH7wQosSaTK0VJvf5UdK7iSUbTDSNM3U" />
+    <title>nvProbe — GPU Benchmark Suite</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --orange: #d29922;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+        nav {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav .logo { font-weight: 700; font-size: 1.2rem; color: var(--accent); text-decoration: none; }
+        nav .logo span { color: var(--text); }
+        nav a:not(.logo) { color: var(--muted); text-decoration: none; margin-left: 24px; font-size: 0.9rem; transition: color .2s; }
+        nav a:not(.logo):hover { color: var(--text); }
+
+        header {
+            padding: 100px 0 80px;
+            text-align: center;
+        }
+        header h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.02em; }
+        header h1 span { color: var(--accent); }
+        header p { font-size: 1.25rem; color: var(--muted); max-width: 600px; margin: 16px auto 32px; }
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            border-radius: var(--radius);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all .2s;
+            margin: 0 8px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: #4c96e8; transform: translateY(-1px); }
+        .btn-outline { border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--muted); transform: translateY(-1px); }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin: 0 4px;
+        }
+        .badge-py { background: #306998; color: #fff; }
+        .badge-cuda { background: #76b900; color: #000; }
+        .badge-hpc { background: var(--orange); color: #000; }
+
+        section { padding: 80px 0; }
+        section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 48px; text-align: center; }
+
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            transition: border-color .2s;
+        }
+        .feature:hover { border-color: var(--muted); }
+        .feature .icon { font-size: 2rem; margin-bottom: 16px; }
+        .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
+        .feature p { font-size: 0.9rem; color: var(--muted); }
+
+        .code-block {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+        .code-block .comment { color: var(--muted); }
+        .code-block .cmd { color: var(--green); }
+        .code-block .out { color: #8b949e; }
+
+        .steps { counter-reset: step; max-width: 600px; margin: 0 auto; }
+        .step {
+            counter-increment: step;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .step::before {
+            content: counter(step);
+            background: var(--accent);
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .step-content { flex: 1; }
+        .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+        .step-content p { font-size: 0.9rem; color: var(--muted); }
+
+        .benchmarks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 32px; }
+        .benchmark-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            text-align: center;
+        }
+        .benchmark-card h3 { font-size: 1.1rem; }
+        .benchmark-card p { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+        .benchmark-card .tag { font-size: 0.75rem; display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 10px; background: var(--border); }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 40px 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        footer a { color: var(--accent); text-decoration: none; }
+
+        @media (max-width: 640px) {
+            header h1 { font-size: 2.4rem; }
+            header p { font-size: 1rem; }
+            nav a:not(.logo) { margin-left: 12px; font-size: 0.8rem; }
+            .features { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <a href="#" class="logo">nv<span>probe</span></a>
+            <div>
+                <a href="https://pypi.org/project/nvprobe/">PyPI</a>
+                <a href="https://github.com/SergioZ3R0/nvprobe">GitHub</a>
+            </div>
+        </nav>
+
+        <header>
+            <h1>nv<span>probe</span></h1>
+            <p>
+                NVIDIA GPU benchmark suite — automate CUDA workloads,
+                run HPL &amp; HPCG, profile custom kernels, compare hardware,
+                and generate rich reports.
+            </p>
+            <div style="margin-bottom: 20px;">
+                <span class="badge badge-py">Python 3.10+</span>
+                <span class="badge badge-cuda">CUDA 12 / 13</span>
+                <span class="badge badge-hpc">HPC</span>
+            </div>
+            <a href="https://pypi.org/project/nvprobe/" class="btn btn-primary">pip install nvprobe</a>
+            <a href="https://github.com/SergioZ3R0/nvprobe" class="btn btn-outline">View on GitHub</a>
+        </header>
+
+        <section>
+            <h2>Why nvProbe?</h2>
+            <div class="features">
+                <div class="feature">
+                    <div class="icon">📊</div>
+                    <h3>Pre-built Benchmarks</h3>
+                    <p>Memory bandwidth, latency, matrix multiply, attention — run standard CUDA workloads with zero setup.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🏎️</div>
+                    <h3>HPL &amp; HPCG</h3>
+                    <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks binaries — downloads and runs automatically.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🧠</div>
+                    <h3>MLPerf Inference</h3>
+                    <p>Run MLPerf inference benchmarks with configurable mode, batch size, and precision.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">📈</div>
+                    <h3>HTML Reports</h3>
+                    <p>Generate interactive HTML reports with charts comparing GPUs, precisions, and problem sizes.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">📦</div>
+                    <h3>Bundled CUDA Runtime</h3>
+                    <p>No system CUDA toolkit required — use <code>cupy-cuda13x[ctk]</code> to bundle CUDA libs with pip.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🖥️</div>
+                    <h3>Slurm Integration</h3>
+                    <p>Submit, monitor, and collect results from HPC clusters — all from a single CLI.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Quick Start</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-content">
+                        <h3>Install</h3>
+                        <div class="code-block"><span class="cmd">pip install --user nvprobe</span></div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-content">
+                        <h3>Initialize config</h3>
+                        <div class="code-block"><span class="cmd">nvprobe init</span></div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-content">
+                        <h3>Run benchmarks</h3>
+                        <div class="code-block"><span class="cmd">nvprobe run --local</span></div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-content">
+                        <h3>Generate report</h3>
+                        <div class="code-block"><span class="cmd">nvprobe report --open</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Benchmarks</h2>
+            <div class="benchmarks">
+                <div class="benchmark-card">
+                    <h3>Bandwidth</h3>
+                    <p>Memory read/write, copy, stride, pointer-chase latency</p>
+                    <span class="tag">CUDA C</span>
+                </div>
+                <div class="benchmark-card">
+                    <h3>Custom Kernels</h3>
+                    <p>MatMul, tiled MatMul, fused attention, reduction</p>
+                    <span class="tag">CuPy</span>
+                </div>
+                <div class="benchmark-card">
+                    <h3>HPL</h3>
+                    <p>High Performance Linpack (FP64)</p>
+                    <span class="tag">MPI</span>
+                </div>
+                <div class="benchmark-card">
+                    <h3>HPCG</h3>
+                    <p>High Performance Conjugate Gradients</p>
+                    <span class="tag">MPI</span>
+                </div>
+                <div class="benchmark-card">
+                    <h3>MLPerf</h3>
+                    <p>MLPerf Inference (test / find_performance / full)</p>
+                    <span class="tag">TFLite</span>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Apache 2.0 &middot; Built with ❤️ by <a href="https://github.com/SergioZ3R0">SergioZ3R0</a></p>
+        </footer>
+    </div>
+    <!-- Google tag (gtag.js) placeholder for future analytics -->
+</body>
+</html>
