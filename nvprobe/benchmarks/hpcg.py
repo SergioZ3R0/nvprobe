@@ -12,6 +12,84 @@ from nvprobe.benchmarks.base import (
     _diagnose_missing_lib, subprocess_env,
 )
 
+# Heuristic: bytes per grid point for HPCG GPU memory (CSR matrix + vectors + workspace).
+# NVIDIA's GPU-accelerated HPCG uses ~400-500 B/point for main arrays; 600 is conservative.
+_HPCG_GPU_BYTES_PER_POINT = 600
+
+# Heuristic: bytes per grid point for HPCG host memory (pinned buffers, MPI, CUDA driver).
+# The host-side footprint is smaller but can trigger cgroup OOM-kill.
+_HPCG_HOST_BYTES_PER_POINT = 200
+
+
+def _get_available_host_memory() -> int | None:
+    """Return available host memory in bytes, or None if unknown."""
+    try:
+        import psutil
+        return psutil.virtual_memory().available
+    except ImportError:
+        pass
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    return None
+
+
+def _get_available_gpu_memory(gpu_index: int) -> int | None:
+    """Return available GPU memory in bytes for the given device, or None if unknown."""
+    try:
+        import cupy as cp  # fmt: skip
+        cp.cuda.Device(gpu_index).use()
+        free, _ = cp.cuda.runtime.memGetInfo()
+        return free
+    except Exception:
+        pass
+    return None
+
+
+def _estimate_hpcg_memory(grid_size: int) -> tuple[int, int]:
+    """Return (gpu_bytes, host_bytes) estimate for a given HPCG grid size.
+
+    The estimate uses conservative per-point heuristics and a 1.5× safety
+    margin is applied by the caller.
+    """
+    n = grid_size ** 3
+    return n * _HPCG_GPU_BYTES_PER_POINT, n * _HPCG_HOST_BYTES_PER_POINT
+
+
+def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
+    """Check if there is enough memory to run HPCG with the given *grid_size*.
+
+    Returns ``(ok, reason)``.  When *ok* is ``False``, *reason* explains
+    which resource is insufficient.
+    """
+    gpu_need, host_need = _estimate_hpcg_memory(grid_size)
+    gpu_need_mb = gpu_need / 1024 ** 2
+    host_need_mb = host_need / 1024 ** 2
+
+    # GPU memory check (best-effort, only if cupy is available)
+    free_gpu = _get_available_gpu_memory(gpu_index)
+    if free_gpu is not None and free_gpu < gpu_need * 1.5:
+        free_gpu_mb = free_gpu / 1024 ** 2
+        return False, (
+            f"grid_size={grid_size} requiere ~{gpu_need_mb:.0f} MB de GPU, "
+            f"pero solo hay {free_gpu_mb:.0f} MB libres — se omite para evitar OOM"
+        )
+
+    # Host memory check (best-effort)
+    free_host = _get_available_host_memory()
+    if free_host is not None and free_host < host_need * 1.5:
+        free_host_mb = free_host / 1024 ** 2
+        return False, (
+            f"grid_size={grid_size} requiere ~{host_need_mb:.0f} MB de RAM del host, "
+            f"pero solo hay {free_host_mb:.0f} MB disponibles — se omite para evitar OOM-Kill"
+        )
+
+    return True, ""
+
 
 def _find_mpi_run() -> str | None:
     for name in ["mpirun", "srun"]:
@@ -64,6 +142,18 @@ def _run_hpcg_size(
         stderr = getattr(exc, "stderr", "") or ""
         stdout = getattr(exc, "stdout", "") or ""
         detail = stderr.strip()[-500:] if stderr else stdout.strip()[-500:]
+
+        # Exit code 137 = SIGKILL, almost always OOM
+        if isinstance(exc, subprocess.CalledProcessError) and exc.returncode == 137:
+            return BenchmarkResult(
+                benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+                precision=precision, batch_size=batch_size,
+                success=False,
+                error=f"posible OOM (proceso terminado con SIGKILL, exit code 137)\n"
+                      f"grid_size={size} consumió más memoria de la disponible.\n"
+                      f"{detail}",
+            )
+
         if "cannot open shared object file" in detail:
             for lib in KNOWN_MISSING_LIBS:
                 if lib in detail:
@@ -102,6 +192,17 @@ class HpcgBenchmark(BaseBenchmark):
         binary_str = str(binary_path)
 
         for size in grid_sizes:
+            ok, reason = _check_hpcg_memory(size, gpu_index)
+            if not ok:
+                if last_result is None:
+                    last_result = BenchmarkResult(
+                        benchmark=self.name, gpu_model="unknown",
+                        gpu_index=gpu_index, precision=precision,
+                        batch_size=batch_size, success=False,
+                        error=f"todos los tamaños omitidos — {reason}",
+                    )
+                continue
+
             result = _run_hpcg_size(binary_str, size, mpi_run, env, gpu_index, precision, batch_size)
             if result is None or result.success:
                 last_result = result or last_result

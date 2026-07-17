@@ -419,17 +419,24 @@ def setup(
 
         # Check if installed cupy matches current CUDA version
         cupy_ok = False
+        found_cupy_packages: list[str] = []
         try:
             import importlib.metadata
             for dist in importlib.metadata.distributions():
-                if dist.metadata["Name"].startswith("cupy-cuda"):
-                    installed_ver = dist.metadata["Name"]
-                    console.print(f"  Installed: {installed_ver}")
-                    if installed_ver == cupy_pkg:
+                name = dist.metadata["Name"]
+                if name and name.startswith("cupy-cuda"):
+                    found_cupy_packages.append(name)
+                    if name == cupy_pkg:
                         cupy_ok = True
                     else:
-                        console.print(f"  [yellow]CUDA version mismatch! {installed_ver} vs needed {cupy_pkg}[/yellow]")
-                    break
+                        console.print(f"  [yellow]CUDA version mismatch! {name} vs needed {cupy_pkg}[/yellow]")
+            if len(found_cupy_packages) > 1:
+                console.print(
+                    f"  [yellow]Múltiples cupy-cuda detectados: {', '.join(found_cupy_packages)}. "
+                    f"Considera desinstalar el que no corresponda: "
+                    f"pip uninstall {' '.join(p for p in found_cupy_packages if p != cupy_pkg)}"
+                    f"[/yellow]"
+                )
         except Exception:
             pass
 
