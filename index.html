@@ -98,8 +98,27 @@
             font-size: 0.9rem;
             overflow-x: auto;
             margin: 16px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
-        .code-block .cmd { color: var(--neon); }
+        .code-block .cmd { color: var(--neon); white-space: nowrap; }
+        .code-block .copy-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 6px;
+            flex-shrink: 0;
+            line-height: 0;
+            transition: border-color .2s;
+        }
+        .code-block .copy-btn:hover { border-color: var(--green); }
+        .code-block .copy-btn svg { width: 18px; height: 18px; display: block; }
+        .code-block .copy-btn .check { display: none; }
+        .code-block .copy-btn.copied .clip { display: none; }
+        .code-block .copy-btn.copied .check { display: block; }
 
         .steps { counter-reset: step; max-width: 600px; margin: 0 auto; }
         .step {
@@ -203,7 +222,7 @@
                 <span class="badge badge-cuda">CUDA 12 / 13</span>
                 <span class="badge badge-hpc">HPC</span>
             </div>
-            <a href="https://pypi.org/project/nvprobe/" class="btn btn-primary">pip install nvprobe</a>
+            <a href="https://pypi.org/project/nvprobe/" class="btn btn-primary">View on PyPI</a>
             <a href="https://github.com/SergioZ3R0/nvprobe" class="btn btn-outline">View on GitHub</a>
         </header>
 
@@ -249,25 +268,49 @@
                 <div class="step">
                     <div class="step-content">
                         <h3>Install</h3>
-                        <div class="code-block"><span class="cmd">pip install --user nvprobe</span></div>
+                        <div class="code-block">
+                            <span class="cmd">pip install --user nvprobe</span>
+                            <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
+                                <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="step">
                     <div class="step-content">
                         <h3>Initialize config</h3>
-                        <div class="code-block"><span class="cmd">nvprobe init</span></div>
+                        <div class="code-block">
+                            <span class="cmd">nvprobe init</span>
+                            <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
+                                <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="step">
                     <div class="step-content">
                         <h3>Run benchmarks</h3>
-                        <div class="code-block"><span class="cmd">nvprobe run --local</span></div>
+                        <div class="code-block">
+                            <span class="cmd">nvprobe run --local</span>
+                            <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
+                                <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="step">
                     <div class="step-content">
                         <h3>Generate report</h3>
-                        <div class="code-block"><span class="cmd">nvprobe report --open</span></div>
+                        <div class="code-block">
+                            <span class="cmd">nvprobe report --open</span>
+                            <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
+                                <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -308,5 +351,15 @@
             <p>Apache 2.0 &middot; Built with ❤️ by <a href="https://github.com/SergioZ3R0">SergioZ3R0</a></p>
         </footer>
     </div>
+
+    <script>
+        function copyCmd(btn) {
+            const cmd = btn.parentElement.querySelector('.cmd').textContent;
+            navigator.clipboard.writeText(cmd).then(() => {
+                btn.classList.add('copied');
+                setTimeout(() => btn.classList.remove('copied'), 1500);
+            });
+        }
+    </script>
 </body>
 </html>
