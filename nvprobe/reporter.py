@@ -187,7 +187,150 @@ def _chart_attention(results: list[dict[str, Any]]) -> str:
     return _fig_to_base64(fig)
 
 
-def _chart_gpu_comparison(results: list[dict[str, Any]]) -> str:
+def _chart_hpl(results: list[dict[str, Any]]) -> str:
+    """Generate HPL GFLOPS bar chart per problem size."""
+    data: list[tuple[str, int, float]] = []
+    for r in results:
+        if not r.get("success"):
+            continue
+        if r["benchmark"] != "hpl":
+            continue
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        gflops = metrics.get("gflops")
+        size = metrics.get("problem_size")
+        if gflops and size:
+            label = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+            data.append((label, int(size), float(gflops)))
+
+    if not data:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    labels = sorted(set(d[0] for d in data))
+    by_label: dict[str, list[tuple[int, float]]] = {l: [] for l in labels}
+    for label, size, gflops in data:
+        by_label[label].append((size, gflops))
+
+    width = 0.8 / max(len(labels), 1)
+    for i, label in enumerate(labels):
+        pairs = sorted(by_label[label])
+        sizes = [p[0] for p in pairs]
+        vals = [p[1] for p in pairs]
+        x = [j + i * width for j in range(len(sizes))]
+        ax.bar(x, vals, width, label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)])
+
+    ax.set_xlabel("Problem Size (N)")
+    ax.set_ylabel("GFLOPS")
+    ax.set_title("HPL — High Performance Linpack")
+    all_sizes = sorted(set(d[1] for d in data))
+    ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
+    ax.set_xticklabels([str(s) for s in all_sizes])
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", alpha=0.3)
+
+    return _fig_to_base64(fig)
+
+
+def _chart_hpcg(results: list[dict[str, Any]]) -> str:
+    """Generate HPCG GFLOPS bar chart per grid size."""
+    data: list[tuple[str, int, float]] = []
+    for r in results:
+        if not r.get("success"):
+            continue
+        if r["benchmark"] != "hpcg":
+            continue
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        gflops = metrics.get("gflops")
+        size = metrics.get("grid_size")
+        if gflops and size:
+            label = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+            data.append((label, int(size), float(gflops)))
+
+    if not data:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    labels = sorted(set(d[0] for d in data))
+    by_label: dict[str, list[tuple[int, float]]] = {l: [] for l in labels}
+    for label, size, gflops in data:
+        by_label[label].append((size, gflops))
+
+    width = 0.8 / max(len(labels), 1)
+    for i, label in enumerate(labels):
+        pairs = sorted(by_label[label])
+        sizes = [p[0] for p in pairs]
+        vals = [p[1] for p in pairs]
+        x = [j + i * width for j in range(len(sizes))]
+        ax.bar(x, vals, width, label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)])
+
+    ax.set_xlabel("Grid Size (N×N×N)")
+    ax.set_ylabel("GFLOPS")
+    ax.set_title("HPCG — High Performance Conjugate Gradients")
+    all_sizes = sorted(set(d[1] for d in data))
+    ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
+    ax.set_xticklabels([str(s) for s in all_sizes])
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", alpha=0.3)
+
+    return _fig_to_base64(fig)
+
+
+def _chart_summary(results: list[dict[str, Any]]) -> str:
+    """Generate a summary dashboard: pass/fail per benchmark + avg performance."""
+    bench_stats: dict[str, dict[str, Any]] = {}
+    for r in results:
+        name = r["benchmark"]
+        if name not in bench_stats:
+            bench_stats[name] = {"total": 0, "passed": 0, "gflops": []}
+        bench_stats[name]["total"] += 1
+        if r.get("success"):
+            bench_stats[name]["passed"] += 1
+            metrics = _parse_metrics(r.get("metrics", "{}"))
+            gflops = metrics.get("gflops") or metrics.get("tflops")
+            if gflops:
+                bench_stats[name]["gflops"].append(float(gflops))
+
+    if not bench_stats:
+        return ""
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    names = list(bench_stats.keys())
+    passed = [bench_stats[n]["passed"] for n in names]
+    failed = [bench_stats[n]["total"] - bench_stats[n]["passed"] for n in names]
+
+    x = range(len(names))
+    w = 0.35
+    ax1.bar([i - w/2 for i in x], passed, w, label="Passed", color="#28a745")
+    ax1.bar([i + w/2 for i in x], failed, w, label="Failed", color="#dc3545")
+    ax1.set_xticks(list(x))
+    ax1.set_xticklabels(names)
+    ax1.set_ylabel("Run Count")
+    ax1.set_title("Pass / Fail by Benchmark")
+    ax1.legend(fontsize=8)
+    ax1.grid(axis="y", alpha=0.3)
+
+    perf_names = []
+    perf_vals = []
+    for n in names:
+        vals = bench_stats[n]["gflops"]
+        if vals:
+            perf_names.append(n)
+            perf_vals.append(sum(vals) / len(vals))
+    if perf_names:
+        bars = ax2.barh(perf_names, perf_vals, color=SERIES_COLORS[:len(perf_names)])
+        for bar, val in zip(bars, perf_vals):
+            ax2.text(bar.get_width() + max(perf_vals) * 0.01, bar.get_y() + bar.get_height() / 2,
+                    f"{val:.1f}", va="center", fontsize=9)
+        ax2.set_xlabel("Avg GFLOPS")
+        ax2.set_title("Average Performance by Benchmark")
+        ax2.grid(axis="x", alpha=0.3)
+    else:
+        ax2.text(0.5, 0.5, "No performance data", ha="center", va="center",
+                transform=ax2.transAxes, color="gray")
+
+    fig.tight_layout()
+    return _fig_to_base64(fig)
     """Generate GPU comparison bar chart (avg performance per GPU)."""
     gpu_perf: dict[str, list[float]] = {}
     for r in results:
@@ -251,6 +394,9 @@ def generate_report(
         "matmul": _chart_matmul(results),
         "tiled_matmul": _chart_tiled_matmul(results),
         "attention": _chart_attention(results),
+        "hpl": _chart_hpl(results),
+        "hpcg": _chart_hpcg(results),
+        "summary": _chart_summary(results),
         "gpu_comparison": _chart_gpu_comparison(results),
     }
 
@@ -321,6 +467,8 @@ def _render_html(
         gpu_rows += f"<tr><td>{g['index']}</td><td>{g['model']}</td><td>{g['memory_total_mb']} MB</td></tr>\n"
 
     chart_html = ""
+    if charts.get("summary"):
+        chart_html += f'<div class="chart"><img src="{charts["summary"]}" alt="Summary"></div>\n'
     if charts.get("bandwidth"):
         chart_html += f'<div class="chart"><img src="{charts["bandwidth"]}" alt="Bandwidth"></div>\n'
     if charts.get("matmul"):
@@ -329,6 +477,10 @@ def _render_html(
         chart_html += f'<div class="chart"><img src="{charts["tiled_matmul"]}" alt="Tiled Matmul"></div>\n'
     if charts.get("attention"):
         chart_html += f'<div class="chart"><img src="{charts["attention"]}" alt="Attention"></div>\n'
+    if charts.get("hpl"):
+        chart_html += f'<div class="chart"><img src="{charts["hpl"]}" alt="HPL"></div>\n'
+    if charts.get("hpcg"):
+        chart_html += f'<div class="chart"><img src="{charts["hpcg"]}" alt="HPCG"></div>\n'
     if charts.get("gpu_comparison"):
         chart_html += f'<div class="chart"><img src="{charts["gpu_comparison"]}" alt="GPU Comparison"></div>\n'
 
