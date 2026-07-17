@@ -432,8 +432,8 @@ def setup(
                         console.print(f"  [yellow]CUDA version mismatch! {name} vs needed {cupy_pkg}[/yellow]")
             if len(found_cupy_packages) > 1:
                 console.print(
-                    f"  [yellow]Múltiples cupy-cuda detectados: {', '.join(found_cupy_packages)}. "
-                    f"Considera desinstalar el que no corresponda: "
+                    f"  [yellow]Multiple cupy-cuda packages detected: {', '.join(found_cupy_packages)}. "
+                    f"Consider uninstalling the mismatched one(s): "
                     f"pip uninstall {' '.join(p for p in found_cupy_packages if p != cupy_pkg)}"
                     f"[/yellow]"
                 )

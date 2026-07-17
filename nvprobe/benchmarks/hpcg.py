@@ -75,8 +75,8 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
     if free_gpu is not None and free_gpu < gpu_need * 1.5:
         free_gpu_mb = free_gpu / 1024 ** 2
         return False, (
-            f"grid_size={grid_size} requiere ~{gpu_need_mb:.0f} MB de GPU, "
-            f"pero solo hay {free_gpu_mb:.0f} MB libres — se omite para evitar OOM"
+            f"grid_size={grid_size} requires ~{gpu_need_mb:.0f} MB of GPU memory, "
+            f"only {free_gpu_mb:.0f} MB free — skipping to avoid OOM"
         )
 
     # Host memory check (best-effort)
@@ -84,8 +84,8 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
     if free_host is not None and free_host < host_need * 1.5:
         free_host_mb = free_host / 1024 ** 2
         return False, (
-            f"grid_size={grid_size} requiere ~{host_need_mb:.0f} MB de RAM del host, "
-            f"pero solo hay {free_host_mb:.0f} MB disponibles — se omite para evitar OOM-Kill"
+            f"grid_size={grid_size} requires ~{host_need_mb:.0f} MB of host RAM, "
+            f"only {free_host_mb:.0f} MB available — skipping to avoid OOM-kill"
         )
 
     return True, ""
@@ -149,8 +149,8 @@ def _run_hpcg_size(
                 benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False,
-                error=f"posible OOM (proceso terminado con SIGKILL, exit code 137)\n"
-                      f"grid_size={size} consumió más memoria de la disponible.\n"
+                error=f"possible OOM (process killed with SIGKILL, exit code 137)\n"
+                      f"grid_size={size} exhausted available memory.\n"
                       f"{detail}",
             )
 
@@ -199,7 +199,7 @@ class HpcgBenchmark(BaseBenchmark):
                         benchmark=self.name, gpu_model="unknown",
                         gpu_index=gpu_index, precision=precision,
                         batch_size=batch_size, success=False,
-                        error=f"todos los tamaños omitidos — {reason}",
+                        error=f"all grid sizes skipped — {reason}",
                     )
                 continue
 
@@ -217,8 +217,8 @@ class HpcgBenchmark(BaseBenchmark):
                             benchmark=self.name, gpu_model=result2.gpu_model,
                             gpu_index=gpu_index, precision=precision, batch_size=batch_size,
                             success=False,
-                            error="intento con mpirun:\n" + result.error
-                                  + "\n\nintento singleton:\n" + result2.error,
+                            error="attempt with mpirun:\n" + result.error
+                                  + "\n\nattempt singleton:\n" + result2.error,
                         )
                     last_result = result2
                     if not last_result.success:

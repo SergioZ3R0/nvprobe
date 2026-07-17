@@ -181,8 +181,8 @@ class HplBenchmark(BaseBenchmark):
                             benchmark=self.name, gpu_model=result2.gpu_model,
                             gpu_index=gpu_index, precision=precision, batch_size=batch_size,
                             success=False,
-                            error="intento con mpirun:\n" + result.error
-                                  + "\n\nintento singleton:\n" + result2.error,
+                            error="attempt with mpirun:\n" + result.error
+                                  + "\n\nattempt singleton:\n" + result2.error,
                         )
                     last_result = result2
                     if not last_result.success:
