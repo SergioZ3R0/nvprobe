@@ -24,7 +24,7 @@ def _find_cupy_cuda_libs() -> list[str]:
             if name.startswith("cupy-cuda"):
                 # Use public locate_file() API (Python 3.9+), fall back to _path
                 try:
-                    loc = dist.locate_file("").parent  # site-packages/
+                    loc = dist.locate_file("")  # site-packages/
                 except Exception:
                     loc = dist._path.parent
                 # [ctk] installs libs under cupy_cudaXXX.libs/
@@ -116,7 +116,7 @@ def _find_nccl_libs() -> list[str]:
             name = dist.metadata["Name"] or ""
             if name.startswith("nvidia-nccl-cu"):
                 try:
-                    loc = dist.locate_file("").parent  # site-packages/
+                    loc = dist.locate_file("")  # site-packages/
                 except Exception:
                     loc = dist._path.parent
                 nccl_lib = str(loc / "nvidia" / "nccl" / "lib")
@@ -179,7 +179,7 @@ def _find_cudnn_libs() -> list[str]:
             name = dist.metadata["Name"] or ""
             if name.startswith("nvidia-cudnn-cu"):
                 try:
-                    loc = dist.locate_file("").parent
+                    loc = dist.locate_file("")
                 except Exception:
                     loc = dist._path.parent
                 cudnn_lib = str(loc / "nvidia" / "cudnn" / "lib")
@@ -242,7 +242,7 @@ def _find_cudnn_root() -> str | None:
             name = dist.metadata["Name"] or ""
             if name.startswith("nvidia-cudnn-cu"):
                 try:
-                    loc = dist.locate_file("").parent
+                    loc = dist.locate_file("")
                 except Exception:
                     loc = dist._path.parent
                 root = str(loc / "nvidia" / "cudnn")
