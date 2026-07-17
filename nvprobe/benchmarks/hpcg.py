@@ -13,16 +13,50 @@ from nvprobe.benchmarks.base import (
 )
 
 # Heuristic: bytes per grid point for HPCG GPU memory (CSR matrix + vectors + workspace).
-# NVIDIA's GPU-accelerated HPCG uses ~400-500 B/point for main arrays; 600 is conservative.
-_HPCG_GPU_BYTES_PER_POINT = 600
+# NVIDIA's GPU-accelerated HPCG uses ~400-500 B/point for main arrays; 1200 is very conservative.
+_HPCG_GPU_BYTES_PER_POINT = 1200
 
 # Heuristic: bytes per grid point for HPCG host memory (pinned buffers, MPI, CUDA driver).
 # The host-side footprint is smaller but can trigger cgroup OOM-kill.
-_HPCG_HOST_BYTES_PER_POINT = 200
+_HPCG_HOST_BYTES_PER_POINT = 500
 
 
 def _get_available_host_memory() -> int | None:
-    """Return available host memory in bytes, or None if unknown."""
+    """Return available host memory in bytes, or None if unknown.
+
+    Tries (in order): cgroup memory limit, psutil, /proc/meminfo.
+    On Slurm clusters, the cgroup limit (if set) is the binding constraint.
+    """
+    # 1. Try cgroup v1 memory limit
+    try:
+        with open("/proc/self/cgroup") as f:
+            for line in f:
+                if "memory" in line and ":" in line:
+                    cgroup_path = line.split(":")[2].strip()
+                    if cgroup_path:
+                        mem_limit = f"/sys/fs/cgroup/memory{cgroup_path}/memory.limit_in_bytes"
+                        if os.path.exists(mem_limit):
+                            with open(mem_limit) as mf:
+                                val = int(mf.read().strip())
+                                if val > 0 and val < 2**63:
+                                    return val
+    except Exception:
+        pass
+    # 2. Try cgroup v2 memory limit
+    try:
+        with open("/proc/self/cgroup") as f:
+            for line in f:
+                if "0::" in line:
+                    cgroup_path = line.split("::")[1].strip()
+                    if cgroup_path:
+                        mem_max = f"/sys/fs/cgroup{cgroup_path}/memory.max"
+                        if os.path.exists(mem_max):
+                            with open(mem_max) as mf:
+                                val = mf.read().strip()
+                                if val and val != "max":
+                                    return int(val) * 1024  # memory.max is in bytes
+    except Exception:
+        pass
     try:
         import psutil
         return psutil.virtual_memory().available
@@ -151,6 +185,8 @@ def _run_hpcg_size(
                 success=False,
                 error=f"possible OOM (process killed with SIGKILL, exit code 137)\n"
                       f"grid_size={size} exhausted available memory.\n"
+                      f"This may be caused by a Slurm cgroup memory limit. "
+                      f"Try a smaller grid_size or request more memory with --mem.\n"
                       f"{detail}",
             )
 

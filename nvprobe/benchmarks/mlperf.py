@@ -46,37 +46,6 @@ def _ensure_mlperf_deps() -> None:
     _ensure_pip_package("loguru")
 
 
-def _register_cudnn_with_mlcr(mlperf_cmd: str, cudnn_root: str) -> str | None:
-    """Pre-register a pip-installed cuDNN with mlcr's cache so it is found
-    during the MLPerf pipeline dependency resolution.
-
-    Returns ``None`` on success or an error message on failure.
-    """
-    cudnn_lib = os.path.join(cudnn_root, "lib")
-    if not os.path.isdir(cudnn_lib):
-        return f"cuDNN lib directory not found: {cudnn_lib}"
-
-    env = os.environ.copy()
-    env["CUDNN_ROOT"] = cudnn_root
-    # Pre-set CM_TMP_PATH so step 2 of get-cudnn/customize.py finds
-    # libcudnn.so immediately (single-directory shortcut).
-    env["CM_TMP_PATH"] = cudnn_lib
-
-    cmd = [mlperf_cmd, "get,cudnn,nvidia", f"--input={cudnn_root}"]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
-        if proc.returncode == 0:
-            return None
-        stderr = (proc.stderr or "")[-300:]
-        return f"mlcr get,cudnn,nvidia returned {proc.returncode}: {stderr}"
-    except FileNotFoundError:
-        return f"mlcr command not found: {mlperf_cmd}"
-    except subprocess.TimeoutExpired:
-        return "mlcr get,cudnn timed out"
-    except Exception as exc:
-        return f"mlcr get,cudnn failed: {exc}"
-
-
 class MlperfBenchmark(BaseBenchmark):
     """Wrapper around MLPerf inference via cmx4mlperf."""
 
@@ -140,13 +109,13 @@ class MlperfBenchmark(BaseBenchmark):
         # Point mlcr to pip-installed cuDNN if available
         cudnn_root = _find_cudnn_root()
         if cudnn_root:
+            # mlcr sanitizes environment for sub-scripts, so pass CUDNN_ROOT
+            # explicitly via its --env. CLI flag (propagates to all dependencies).
+            cmd.append(f"--env.CUDNN_ROOT={cudnn_root}")
             env["CUDNN_ROOT"] = cudnn_root
             env["CM_TMP_PATH"] = os.path.join(cudnn_root, "lib")
-            # Pre-register with mlcr's cache so dependency resolution finds it
-            reg_err = _register_cudnn_with_mlcr(mlperf_cmd, cudnn_root)
-            if reg_err:
-                env["CM_CUDA_PATH_LIB_CUDNN"] = os.path.join(cudnn_root, "lib")
-                env["CM_CUDA_PATH_LIB_CUDNN_EXISTS"] = "yes"
+            env["CM_CUDA_PATH_LIB_CUDNN"] = os.path.join(cudnn_root, "lib")
+            env["CM_CUDA_PATH_LIB_CUDNN_EXISTS"] = "yes"
 
         try:
             proc = subprocess.run(
@@ -196,13 +165,16 @@ class MlperfBenchmark(BaseBenchmark):
                 pip_cmd = f"pip install --user nvidia-cudnn-cu{cuda_ver}"
                 detail = (
                     "cuDNN not detected by MLPerf pipeline.\n"
-                    f"  1. (recommended) Install the pip package: {pip_cmd}\n"
-                    "     Then run 'nvprobe run' again (auto-detected).\n"
-                    "  2. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
-                    "     then register it:\n"
-                    f"       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
-                    "  3. If cuDNN is already installed system-wide, set:\n"
-                    "       export CUDNN_ROOT=/path/to/cudnn"
+                    "  mlcr's sub-scripts do not inherit the parent environment,\n"
+                    "  so CUDNN_ROOT and LD_LIBRARY_PATH are not visible to them.\n"
+                    "  Options:\n"
+                    f"  1. Install cuDNN system-wide (RPM/deb): {pip_cmd}\n"
+                    "  2. Register cuDNN manually with mlcr:\n"
+                    f"       mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')\n"
+                    "     Then run 'nvprobe run' again.\n"
+                    "  3. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
+                    "     and register it:\n"
+                    f"       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz"
                 )
             elif "Permission denied" in detail:
                 detail += "\n\nFix: pip install --user loguru"
