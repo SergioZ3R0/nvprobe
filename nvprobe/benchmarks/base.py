@@ -105,27 +105,59 @@ def _find_system_cuda_libs() -> list[str]:
     return found
 
 
-def _find_nccl_libs() -> list[str]:
-    """Find NCCL library directories (system or pip-installed nvidia-nccl-cuXX)."""
-    dirs: list[str] = []
+def _find_nvidia_pip_lib(pip_prefix: str, subpath: str) -> list[str]:
+    """Find library directories for a pip-installed NVIDIA package.
 
-    # 1. Check pip-installed nvidia-nccl-cuXX package
+    *pip_prefix* is e.g. ``"nvidia-nccl-cu"``, ``"nvidia-cudnn-cu"``,
+    ``"nvidia-nvshmem-cu"``.
+    *subpath* is the relative path inside the package that contains
+    ``.so`` files, e.g. ``"nvidia/nccl/lib"``.
+    """
+    dirs: list[str] = []
     try:
         import importlib.metadata
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"] or ""
-            if name.startswith("nvidia-nccl-cu"):
+            if name.startswith(pip_prefix):
                 try:
                     loc = dist.locate_file("")  # site-packages/
                 except Exception:
                     loc = dist._path.parent
-                nccl_lib = str(loc / "nvidia" / "nccl" / "lib")
-                if os.path.isdir(nccl_lib) and nccl_lib not in dirs:
-                    dirs.append(nccl_lib)
+                lib_dir = str(loc / subpath)
+                if os.path.isdir(lib_dir) and lib_dir not in dirs:
+                    dirs.append(lib_dir)
     except Exception:
         pass
+    return dirs
 
-    # 2. Search system paths for libnccl.so
+
+def _find_nvidia_pip_root(pip_prefix: str, subpath: str) -> str | None:
+    """Return the root directory of a pip-installed NVIDIA package.
+
+    Returns the *subpath* directory only if it has a ``lib/`` child.
+    Used e.g. to find the ``nvidia/cudnn`` root for ``CUDNN_ROOT``.
+    """
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith(pip_prefix):
+                try:
+                    loc = dist.locate_file("")
+                except Exception:
+                    loc = dist._path.parent
+                root = str(loc / subpath)
+                if os.path.isdir(os.path.join(root, "lib")):
+                    return root
+    except Exception:
+        pass
+    return None
+
+
+def _find_nccl_libs() -> list[str]:
+    """Find NCCL library directories (system or pip-installed nvidia-nccl-cuXX)."""
+    dirs = _find_nvidia_pip_lib("nvidia-nccl-cu", "nvidia/nccl/lib")
+
     candidates = [
         "/usr/lib64",
         "/usr/lib/x86_64-linux-gnu",
@@ -135,8 +167,12 @@ def _find_nccl_libs() -> list[str]:
     for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
         cuda_path = os.environ.get(env_var)
         if cuda_path:
-            candidates.insert(0, os.path.join(cuda_path, "lib64"))
-            candidates.insert(0, os.path.join(cuda_path, "compat"))
+            p = os.path.join(cuda_path, "lib64")
+            if p not in candidates:
+                candidates.insert(0, p)
+            p = os.path.join(cuda_path, "compat")
+            if p not in candidates:
+                candidates.insert(0, p)
     nvcc = shutil.which("nvcc")
     if nvcc:
         toolkit_base = str(Path(nvcc).parent.parent)
@@ -144,7 +180,6 @@ def _find_nccl_libs() -> list[str]:
             p = os.path.join(toolkit_base, sub)
             if p not in candidates:
                 candidates.insert(0, p)
-    # Also check paths derived from nvidia-smi
     nvidia_smi = shutil.which("nvidia-smi")
     if nvidia_smi:
         nvidia_dir = str(Path(nvidia_smi).parent)
@@ -170,25 +205,8 @@ def _find_nccl_libs() -> list[str]:
 
 def _find_cudnn_libs() -> list[str]:
     """Find cuDNN library directories (pip-installed nvidia-cudnn-cuXX or system)."""
-    dirs: list[str] = []
+    dirs = _find_nvidia_pip_lib("nvidia-cudnn-cu", "nvidia/cudnn/lib")
 
-    # 1. Check pip-installed nvidia-cudnn-cuXX package
-    try:
-        import importlib.metadata
-        for dist in importlib.metadata.distributions():
-            name = dist.metadata["Name"] or ""
-            if name.startswith("nvidia-cudnn-cu"):
-                try:
-                    loc = dist.locate_file("")
-                except Exception:
-                    loc = dist._path.parent
-                cudnn_lib = str(loc / "nvidia" / "cudnn" / "lib")
-                if os.path.isdir(cudnn_lib) and cudnn_lib not in dirs:
-                    dirs.append(cudnn_lib)
-    except Exception:
-        pass
-
-    # 2. System paths
     candidates = [
         "/usr/lib64",
         "/usr/lib/x86_64-linux-gnu",
@@ -234,23 +252,58 @@ def _find_cudnn_libs() -> list[str]:
     return dirs
 
 
+def _find_nvshmem_libs() -> list[str]:
+    """Find NVSHMEM library directories (pip-installed nvidia-nvshmem-cuXX or system)."""
+    dirs = _find_nvidia_pip_lib("nvidia-nvshmem-cu", "nvidia/nvshmem/lib")
+
+    candidates = [
+        "/usr/lib64",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/local/cuda/lib64",
+        "/usr/local/cuda/compat",
+    ]
+    for env_var in ("CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"):
+        cuda_path = os.environ.get(env_var)
+        if cuda_path:
+            p = os.path.join(cuda_path, "lib64")
+            if p not in candidates:
+                candidates.insert(0, p)
+            p = os.path.join(cuda_path, "compat")
+            if p not in candidates:
+                candidates.insert(0, p)
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        toolkit_base = str(Path(nvcc).parent.parent)
+        for sub in ("lib64", "lib", "compat"):
+            p = os.path.join(toolkit_base, sub)
+            if p not in candidates:
+                candidates.insert(0, p)
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        nvidia_dir = str(Path(nvidia_smi).parent)
+        for sub in ("", "../lib64", "../lib", "../compat"):
+            p = os.path.normpath(os.path.join(nvidia_dir, sub))
+            if p not in candidates:
+                candidates.insert(0, p)
+
+    for path in candidates:
+        p = os.path.realpath(path)
+        if not os.path.isdir(p):
+            continue
+        try:
+            files = os.listdir(p)
+        except OSError:
+            continue
+        if any(f.startswith("libnvshmem") for f in files):
+            if p not in dirs:
+                dirs.append(p)
+
+    return dirs
+
+
 def _find_cudnn_root() -> str | None:
     """Return the cuDNN root directory if nvidia-cudnn-cuXX is pip-installed."""
-    try:
-        import importlib.metadata
-        for dist in importlib.metadata.distributions():
-            name = dist.metadata["Name"] or ""
-            if name.startswith("nvidia-cudnn-cu"):
-                try:
-                    loc = dist.locate_file("")
-                except Exception:
-                    loc = dist._path.parent
-                root = str(loc / "nvidia" / "cudnn")
-                if os.path.isdir(os.path.join(root, "lib")):
-                    return root
-    except Exception:
-        pass
-    return None
+    return _find_nvidia_pip_root("nvidia-cudnn-cu", "nvidia/cudnn")
 
 
 def _ensure_pip_package(pip_name: str) -> bool:
@@ -286,7 +339,7 @@ def _ensure_pip_package(pip_name: str) -> bool:
 
 
 # Libraries that NVIDIA HPC benchmark binaries may require at runtime.
-KNOWN_MISSING_LIBS = ("libcublas", "libmpi", "libnccl")
+KNOWN_MISSING_LIBS = ("libcublas", "libmpi", "libnccl", "libnvshmem")
 
 
 def _guess_cuda_major() -> str:
@@ -362,6 +415,19 @@ def _diagnose_missing_lib(lib_name: str, detail: str) -> str:
             f"  Searched cupy paths: {cupy_libs}\n"
             "  Check: CUDA_HOME/lib64, /usr/lib/x86_64-linux-gnu/libnccl*"
         )
+    elif lib_name == "libnvshmem":
+        nvshmem_found = _find_nvshmem_libs()
+        cuda_ver = _guess_cuda_major()
+        detail += (
+            "\n\nNVSHMEM library not found. The HPL binary requires "
+            "libnvshmem_host.so at runtime.\n"
+            "  Install via pip (recommended):\n"
+            f"    pip install --user nvidia-nvshmem-cu{cuda_ver}\n"
+            "  Or install a system NVSHMEM package:\n"
+            "    Ubuntu/Debian: sudo apt install nvidia-nvshmem\n"
+            f"  Searched pip nvidia-nvshmem-cu* paths: {nvshmem_found}\n"
+            "  Check: pip list | grep nvshmem"
+        )
     return detail
 
 
@@ -398,6 +464,7 @@ def subprocess_env() -> dict[str, str]:
     cuda_libs.extend(_find_system_cuda_libs())
     cuda_libs.extend(_find_nccl_libs())
     cuda_libs.extend(_find_cudnn_libs())
+    cuda_libs.extend(_find_nvshmem_libs())
 
     # Add MPI lib paths (for HPL/HPCG binaries compiled against MPI).
     # Only derive paths from mpirun (NOT srun — srun is the Slurm launcher,
@@ -410,6 +477,9 @@ def subprocess_env() -> dict[str, str]:
                 ml = os.path.join(mpi_base, sub)
                 if os.path.isdir(ml) and ml not in cuda_libs:
                     cuda_libs.append(ml)
+            # OpenMPI needs OPAL_PREFIX to find its plugins at runtime
+            if "OPAL_PREFIX" not in env:
+                env["OPAL_PREFIX"] = mpi_base
     # Also check common MPI environment variables set by module systems
     for env_var in ("MPI_HOME", "OPAL_PREFIX", "I_MPI_ROOT"):
         mpi_path = os.environ.get(env_var)

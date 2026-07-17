@@ -176,8 +176,16 @@ class HplBenchmark(BaseBenchmark):
             if mpi_run and ("opal_pmix" in result.error or "orte" in result.error):
                 result2 = _run_hpl_size(binary_str, n, None, env, gpu_index, precision, batch_size)
                 if result2:
+                    if not result2.success and not result.success:
+                        result2 = BenchmarkResult(
+                            benchmark=self.name, gpu_model=result2.gpu_model,
+                            gpu_index=gpu_index, precision=precision, batch_size=batch_size,
+                            success=False,
+                            error="intento con mpirun:\n" + result.error
+                                  + "\n\nintento singleton:\n" + result2.error,
+                        )
                     last_result = result2
-                    if not result2.success:
+                    if not last_result.success:
                         break
                 else:
                     last_result = result

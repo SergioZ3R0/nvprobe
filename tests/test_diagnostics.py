@@ -30,6 +30,15 @@ def test_diagnose_libmpi_does_not_raise() -> None:
     assert len(result) > len(detail)
 
 
+def test_diagnose_libnvshmem_does_not_raise() -> None:
+    detail = "libnvshmem_host.so.3: cannot open shared object file"
+    result = _diagnose_missing_lib("libnvshmem", detail)
+    assert isinstance(result, str)
+    assert len(result) > len(detail)
+    assert "pip install" in result.lower()
+    assert "nvidia-nvshmem-cu" in result
+
+
 def test_diagnose_unknown_lib_passthrough() -> None:
     """Unknown lib names should be returned unchanged (no KeyError / crash)."""
     detail = "some random error"

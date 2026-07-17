@@ -336,6 +336,15 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
         console.print(f"  [yellow]Could not install {cudnn_pkg}[/yellow]")
         console.print(f"  [dim]To install manually: pip install --user {cudnn_pkg}[/dim]")
 
+    # --- Step: Auto-install NVSHMEM (best-effort) ---
+    nvshmem_pkg = f"nvidia-nvshmem-cu{cuda_version}"
+    console.print(f"\n[bold]Step: NVSHMEM runtime library[/bold]")
+    if _ensure_pip_package(nvshmem_pkg):
+        console.print(f"  [green]{nvshmem_pkg} ready[/green]")
+    else:
+        console.print(f"  [yellow]Could not install {nvshmem_pkg}[/yellow]")
+        console.print(f"  [dim]To install manually: pip install --user {nvshmem_pkg}[/dim]")
+
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
     console.print("Add to your shell profile:")
