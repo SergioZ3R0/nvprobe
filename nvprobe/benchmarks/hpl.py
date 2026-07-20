@@ -99,9 +99,10 @@ def _run_hpl_size(
                 f.write(_generate_hpl_dat(n))
 
             if mpi_run:
-                cmd = [mpi_run, "-np", "1", binary]
+                cmd = [mpi_run, "--mca", "pmix", "isolated", "-np", "1", binary]
             else:
                 cmd = [binary]
+                env["OMPI_MCA_pmix"] = "isolated"
 
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=3600, check=True,
@@ -213,7 +214,7 @@ class HplBenchmark(BaseBenchmark):
             lines.append("cat > HPL.dat << 'EOF'")
             lines.append(hpl_dat.strip())
             lines.append("EOF")
-            lines.append(f"mpirun -np 1 {binary_path}")
+            lines.append(f"mpirun --mca pmix isolated -np 1 {binary_path}")
             lines.append("")
         return "\n".join(lines)
 

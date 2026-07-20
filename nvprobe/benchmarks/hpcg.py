@@ -146,13 +146,14 @@ def _run_hpcg_size(
     try:
         rt_seconds = 60
         if mpi_run:
-            cmd = [mpi_run, "-np", "1", binary,
+            cmd = [mpi_run, "--mca", "pmix", "isolated", "-np", "1", binary,
                    f"--nx={size}", f"--ny={size}", f"--nz={size}",
                    f"--rt={rt_seconds}"]
         else:
             cmd = [binary,
                    f"--nx={size}", f"--ny={size}", f"--nz={size}",
                    f"--rt={rt_seconds}"]
+            env["OMPI_MCA_pmix"] = "isolated"
 
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=3600, check=True,
@@ -279,7 +280,7 @@ class HpcgBenchmark(BaseBenchmark):
         return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
 for GS in {' '.join(str(s) for s in grid_sizes)}; do
-    mpirun -np 1 {binary_path} --nx=$GS --ny=$GS --nz=$GS --rt=60
+    mpirun --mca pmix isolated -np 1 {binary_path} --nx=$GS --ny=$GS --nz=$GS --rt=60
 done
 """
 
