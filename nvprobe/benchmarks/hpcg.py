@@ -192,6 +192,25 @@ def _run_hpcg_size(
                       f"{detail}",
             )
 
+        # SIGSEGV during GPU init — known limitation on workstation GPUs
+        rc = getattr(exc, "returncode", 0)
+        if rc == -11 or rc == 139:
+            return BenchmarkResult(
+                benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+                precision=precision, batch_size=batch_size,
+                success=False,
+                error=(
+                    "xhpcg crashed with a segmentation fault during GPU initialization, "
+                    "before producing any output.\n"
+                    "This is a known compatibility issue between the NVIDIA HPC "
+                    "Benchmarks binaries and some workstation/professional GPUs "
+                    "(e.g. RTX Axxx series) outside their officially validated GPU "
+                    "list (A100/H100/etc.).\n"
+                    "This is not fixable from nvprobe. "
+                    "See README.md 'Known Limitations'."
+                ),
+            )
+
         if "cannot open shared object file" in detail:
             for lib in KNOWN_MISSING_LIBS:
                 if lib in detail:
