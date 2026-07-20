@@ -140,9 +140,15 @@ class MlperfBenchmark(BaseBenchmark):
             cmd.append(f"--batch_size={custom_batch_size}")
 
         # Register pip-installed cuDNN with mlcr's cache (once per run)
+        # and pass explicit --adr paths so the MLPerf pipeline finds it.
         cudnn_root = _find_cudnn_root()
         if cudnn_root:
             _register_cudnn_once(mlperf_cmd, cudnn_root)
+            cudnn_lib = os.path.join(cudnn_root, "lib")
+            cudnn_inc = os.path.join(cudnn_root, "include")
+            if os.path.isdir(cudnn_lib):
+                cmd.append(f"--adr.cuda-cudnn.cudnn_lib_path={cudnn_lib}")
+                cmd.append(f"--adr.cuda-cudnn.cudnn_include_path={cudnn_inc}")
 
         try:
             env = subprocess_env()
