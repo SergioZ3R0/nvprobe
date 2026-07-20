@@ -103,6 +103,7 @@ def _run_hpl_size(
             else:
                 cmd = [binary]
                 env["OMPI_MCA_pmix"] = "isolated"
+            print(f"    $ {' '.join(cmd)}")
 
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=3600, check=True,

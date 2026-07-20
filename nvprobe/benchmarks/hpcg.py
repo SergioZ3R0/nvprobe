@@ -154,6 +154,7 @@ def _run_hpcg_size(
                    f"--nx={size}", f"--ny={size}", f"--nz={size}",
                    f"--rt={rt_seconds}"]
             env["OMPI_MCA_pmix"] = "isolated"
+        print(f"    $ {' '.join(cmd)}")
 
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=3600, check=True,

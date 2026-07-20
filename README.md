@@ -11,6 +11,22 @@ nvProbe runs standardized benchmarks across your GPU fleet, captures environment
 ## Features
 
 - **Benchmark modules**: Bandwidth, custom CUDA kernels (matmul, conv2d, attention), HPL, HPCG, MLPerf
+
+## Known Limitations
+
+- **HPL / HPCG on workstation GPUs**: the NVIDIA HPC Benchmarks binaries (xhpl/xhpcg) used by
+  nvprobe are validated by NVIDIA against datacenter GPUs (A100, H100, etc.). On professional
+  workstation GPUs (e.g. the RTX Axxx series), these binaries may crash with a segmentation
+  fault during GPU initialization. This is a limitation of NVIDIA's precompiled binaries, not
+  of nvprobe, and cannot be fixed from this project. Bandwidth and custom kernel benchmarks
+  are unaffected and work correctly on any CUDA-capable GPU.
+
+- **MLPerf cuDNN detection**: the MLPerf pipeline (cmx4mlperf / mlcr) discovers cuDNN by
+  searching system CUDA toolkit paths. If cuDNN is installed via `pip install nvidia-cudnn-cuXX`,
+  you may need to pre-register it with mlcr first:
+
+      mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')
+
 - **Slurm integration**: Generate and submit sbatch scripts, run across multiple nodes/GPUs
 - **Environment fingerprinting**: Driver version, CUDA version, GPU model, memory, PCI bus ID — captured automatically
 - **SQLite storage**: All results persisted with full query capability
