@@ -139,20 +139,27 @@ class MlperfBenchmark(BaseBenchmark):
         if custom_batch_size is not None:
             cmd.append(f"--batch_size={custom_batch_size}")
 
-        # Register pip-installed cuDNN with mlcr's cache (once per run)
-        # and pass explicit --adr paths so the MLPerf pipeline finds it.
+        # Register pip-installed cuDNN with mlcr's cache (once per run).
+        # Also set LD_LIBRARY_PATH so sub-processes find libcudnn at runtime.
         cudnn_root = _find_cudnn_root()
+        cudnn_lib: str | None = None
         if cudnn_root:
             _register_cudnn_once(mlperf_cmd, cudnn_root)
-            cudnn_lib = os.path.join(cudnn_root, "lib")
-            cudnn_inc = os.path.join(cudnn_root, "include")
-            if os.path.isdir(cudnn_lib):
-                cmd.append(f"--adr.cuda-cudnn.cudnn_lib_path={cudnn_lib}")
-                cmd.append(f"--adr.cuda-cudnn.cudnn_include_path={cudnn_inc}")
+            lib = os.path.join(cudnn_root, "lib")
+            if os.path.isdir(lib):
+                cudnn_lib = lib
 
         try:
             env = subprocess_env()
             env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+            if cudnn_lib:
+                env["CUDNN_ROOT"] = cudnn_root
+                env["MLC_CUDA_PATH_LIB_CUDNN"] = cudnn_lib
+                env["MLC_CUDA_PATH_INCLUDE_CUDNN"] = os.path.join(cudnn_root, "include")
+                env["LD_LIBRARY_PATH"] = (
+                    f"{cudnn_lib}:{env['LD_LIBRARY_PATH']}"
+                    if env.get("LD_LIBRARY_PATH") else cudnn_lib
+                )
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=7200, check=True,
                 env=env,
