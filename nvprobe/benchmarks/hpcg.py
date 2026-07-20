@@ -9,7 +9,7 @@ from pathlib import Path
 
 from nvprobe.benchmarks.base import (
     BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
-    _diagnose_missing_lib, subprocess_env,
+    _detect_gpu_model, _diagnose_missing_lib, subprocess_env,
 )
 
 # Heuristic: bytes per grid point for HPCG GPU memory (CSR matrix + vectors + workspace).
@@ -142,6 +142,7 @@ def _build_env(gpu_index: int) -> dict[str, str]:
 def _run_hpcg_size(
     binary: str, size: int, mpi_run: str | None,
     env: dict[str, str], gpu_index: int, precision: str, batch_size: int,
+    gpu_model: str = "unknown",
 ) -> BenchmarkResult | None:
     try:
         rt_seconds = 60
@@ -162,14 +163,14 @@ def _run_hpcg_size(
         )
         gflops = _parse_hpcg_output(proc.stdout)
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
             precision=precision, batch_size=batch_size,
             metrics={"gflops": gflops, "grid_size": size, "run_time": rt_seconds},
             raw_output=proc.stdout,
         )
     except FileNotFoundError:
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
             precision=precision, batch_size=batch_size,
             success=False,
             error="MPI binary not found. Install OpenMPI or MPICH.",
@@ -182,7 +183,7 @@ def _run_hpcg_size(
         # Exit code 137 = SIGKILL, almost always OOM
         if isinstance(exc, subprocess.CalledProcessError) and exc.returncode == 137:
             return BenchmarkResult(
-                benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+                benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False,
                 error=f"possible OOM (process killed with SIGKILL, exit code 137)\n"
@@ -196,7 +197,7 @@ def _run_hpcg_size(
         rc = getattr(exc, "returncode", 0)
         if rc == -11 or rc == 139:
             return BenchmarkResult(
-                benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+                benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False,
                 error=(
@@ -217,7 +218,7 @@ def _run_hpcg_size(
                     detail = _diagnose_missing_lib(lib, detail)
                     break
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model="unknown", gpu_index=gpu_index,
+            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
             precision=precision, batch_size=batch_size,
             success=False, error=f"{exc}\n{detail}".strip(),
         )
@@ -234,10 +235,11 @@ class HpcgBenchmark(BaseBenchmark):
         binary = self.params.get("binary", "xhpcg")
         binary_path = Path(binary).expanduser()
         grid_sizes = self.params.get("grid_sizes", [128])
+        gpu_model = _detect_gpu_model(gpu_index)
 
         if not shutil.which(str(binary_path)) and not binary_path.is_file():
             return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False,
                 error=f"HPCG binary '{binary}' not found. Run 'nvprobe setup-tools' or install xhpcg.",
@@ -253,21 +255,21 @@ class HpcgBenchmark(BaseBenchmark):
             if not ok:
                 if last_result is None:
                     last_result = BenchmarkResult(
-                        benchmark=self.name, gpu_model="unknown",
+                        benchmark=self.name, gpu_model=gpu_model,
                         gpu_index=gpu_index, precision=precision,
                         batch_size=batch_size, success=False,
                         error=f"all grid sizes skipped — {reason}",
                     )
                 continue
 
-            result = _run_hpcg_size(binary_str, size, mpi_run, env, gpu_index, precision, batch_size)
+            result = _run_hpcg_size(binary_str, size, mpi_run, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
             if result is None or result.success:
                 last_result = result or last_result
                 if result and not result.success:
                     break
                 continue
             if mpi_run and ("opal_pmix" in result.error or "orte" in result.error):
-                result2 = _run_hpcg_size(binary_str, size, None, env, gpu_index, precision, batch_size)
+                result2 = _run_hpcg_size(binary_str, size, None, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
                 if result2:
                     if not result2.success and not result.success:
                         result2 = BenchmarkResult(
@@ -287,7 +289,7 @@ class HpcgBenchmark(BaseBenchmark):
                 break
 
         return last_result or BenchmarkResult(
-            benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+            benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
             precision=precision, batch_size=batch_size,
             success=False, error="No grid sizes configured",
         )

@@ -5,11 +5,16 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from nvprobe.benchmarks.base import (
-    BaseBenchmark, BenchmarkResult, _ensure_pip_package,
+    BaseBenchmark, BenchmarkResult, _detect_gpu_model, _ensure_pip_package,
     _find_cudnn_root, subprocess_env,
+)
+
+_CUDNN_REGISTERED_SENTINEL = os.path.join(
+    str(Path.home()), ".nvprobe", ".cudnn_registered"
 )
 
 
@@ -44,6 +49,34 @@ def _normalize_scenario(scenario: str) -> str:
 def _ensure_mlperf_deps() -> None:
     """Pre-install dependencies cr needs but can't install itself (no root)."""
     _ensure_pip_package("loguru")
+
+
+def _register_cudnn_once(mlperf_cmd: str, cudnn_root: str) -> None:
+    """Register pip-installed cuDNN with mlcr's cache (idempotent).
+
+    Runs ``mlcr get,cudnn,nvidia --input=<cudnn_root>`` once and creates
+    a sentinel file so it is not repeated in subsequent calls within the
+    same benchmark run.
+    """
+    if os.path.isfile(_CUDNN_REGISTERED_SENTINEL):
+        return
+    cudnn_lib = os.path.join(cudnn_root, "lib")
+    if not os.path.isdir(cudnn_lib):
+        return
+    try:
+        subprocess.run(
+            [mlperf_cmd, "get,cudnn,nvidia", f"--input={cudnn_root}"],
+            capture_output=True, text=True, timeout=120,
+        )
+    except Exception:
+        pass
+    # Create sentinel even on failure — avoid hammering mlcr on every retry
+    try:
+        sentinel_dir = os.path.dirname(_CUDNN_REGISTERED_SENTINEL)
+        os.makedirs(sentinel_dir, exist_ok=True)
+        Path(_CUDNN_REGISTERED_SENTINEL).touch()
+    except Exception:
+        pass
 
 
 class MlperfBenchmark(BaseBenchmark):
@@ -89,6 +122,8 @@ class MlperfBenchmark(BaseBenchmark):
 
         _ensure_mlperf_deps()
 
+        gpu_model = _detect_gpu_model(gpu_index)
+
         cmd = self._build_cmd(mlperf_cmd, scenario, mode=mode)
         cmd.extend([
             f"--model={model}",
@@ -104,30 +139,21 @@ class MlperfBenchmark(BaseBenchmark):
         if custom_batch_size is not None:
             cmd.append(f"--batch_size={custom_batch_size}")
 
-        env = subprocess_env()
-        env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
-        # Point mlcr to pip-installed cuDNN if available
+        # Register pip-installed cuDNN with mlcr's cache (once per run)
         cudnn_root = _find_cudnn_root()
         if cudnn_root:
-            cudnn_lib = os.path.join(cudnn_root, "lib")
-            cudnn_inc = os.path.join(cudnn_root, "include")
-            if os.path.isdir(cudnn_lib):
-                cmd.append(f"--adr.cuda-cudnn.cudnn_lib_path={cudnn_lib}")
-                cmd.append(f"--adr.cuda-cudnn.cudnn_include_path={cudnn_inc}")
-            env["CUDNN_ROOT"] = cudnn_root
-            env["CM_TMP_PATH"] = cudnn_lib
-            env["CM_CUDA_PATH_LIB_CUDNN"] = cudnn_lib
-            env["CM_CUDA_PATH_LIB_CUDNN_EXISTS"] = "yes"
-            env["CM_CUDA_PATH_INCLUDE_CUDNN"] = cudnn_inc
+            _register_cudnn_once(mlperf_cmd, cudnn_root)
 
         try:
+            env = subprocess_env()
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=7200, check=True,
                 env=env,
             )
             return BenchmarkResult(
                 benchmark=self.name,
-                gpu_model="unknown",
+                gpu_model=gpu_model,
                 gpu_index=gpu_index,
                 precision=precision,
                 batch_size=batch_size,
@@ -140,7 +166,7 @@ class MlperfBenchmark(BaseBenchmark):
             )
         except FileNotFoundError:
             return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False,
                 error="MLPerf CLI not found. Install with: pip install --user cmx4mlperf",
@@ -177,7 +203,7 @@ class MlperfBenchmark(BaseBenchmark):
                 detail += "\n\nFix: pip install --user loguru"
 
             return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
+                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
                 precision=precision, batch_size=batch_size,
                 success=False, error=detail or f"{exc}",
             )

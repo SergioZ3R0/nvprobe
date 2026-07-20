@@ -302,8 +302,48 @@ def _find_nvshmem_libs() -> list[str]:
 
 
 def _find_cudnn_root() -> str | None:
-    """Return the cuDNN root directory if nvidia-cudnn-cuXX is pip-installed."""
-    return _find_nvidia_pip_root("nvidia-cudnn-cu", "nvidia/cudnn")
+    """Return the cuDNN root directory if nvidia-cudnn-cuXX is pip-installed.
+
+    Prefers the CUDA-versioned package (``nvidia-cudnn-cu12`` etc.) over
+    the generic ``nvidia-cudnn``, and returns the highest CUDA-major match
+    when multiple ``-cuXX`` variants are present.
+    """
+    roots: list[tuple[int, str]] = []
+    try:
+        import importlib.metadata
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith("nvidia-cudnn-cu"):
+                try:
+                    loc = dist.locate_file("")
+                except Exception:
+                    loc = dist._path.parent
+                root = str(loc / "nvidia/cudnn")
+                if os.path.isdir(os.path.join(root, "lib")):
+                    # Parse CUDA major from suffix e.g. nvidia-cudnn-cu12 → 12
+                    cuda_major = 0
+                    suffix = name.split("nvidia-cudnn-cu")[-1]
+                    try:
+                        cuda_major = int(suffix)
+                    except ValueError:
+                        pass
+                    roots.append((cuda_major, root))
+            elif name == "nvidia-cudnn" and not roots:
+                # Only fall back to generic nvidia-cudnn if no -cuXX found
+                try:
+                    loc = dist.locate_file("")
+                except Exception:
+                    loc = dist._path.parent
+                root = str(loc / "nvidia/cudnn")
+                if os.path.isdir(os.path.join(root, "lib")):
+                    roots.append((0, root))
+    except Exception:
+        pass
+    if not roots:
+        return None
+    # Return the package with the highest CUDA major (prefers -cuXX over generic)
+    roots.sort(key=lambda x: x[0], reverse=True)
+    return roots[0][1]
 
 
 def _ensure_pip_package(pip_name: str) -> bool:
@@ -340,6 +380,33 @@ def _ensure_pip_package(pip_name: str) -> bool:
 
 # Libraries that NVIDIA HPC benchmark binaries may require at runtime.
 KNOWN_MISSING_LIBS = ("libcublas", "libmpi", "libnccl", "libnvshmem")
+
+
+def _detect_gpu_model(gpu_index: int) -> str:
+    """Return GPU model name for the given device index.
+
+    Uses ``nvidia-smi`` first, falls back to CuPy, then to ``'unknown'``.
+    """
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader",
+             "-i", str(gpu_index)],
+            capture_output=True, text=True, timeout=5,
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    try:
+        import cupy as cp
+        props = cp.cuda.runtime.getDeviceProperties(gpu_index)
+        name = props.get("name", b"unknown")
+        if isinstance(name, bytes):
+            name = name.decode()
+        return str(name)
+    except Exception:
+        pass
+    return "unknown"
 
 
 def _guess_cuda_major() -> str:

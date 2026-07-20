@@ -48,6 +48,15 @@ def _fig_to_base64(fig: plt.Figure) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode("ascii")
 
 
+def _set_legend(ax, n_handles: int):
+    """Place legend outside the plot when there are many entries."""
+    kwargs = {"fontsize": 8}
+    if n_handles > 6:
+        kwargs["bbox_to_anchor"] = (1.05, 1)
+        kwargs["loc"] = "upper left"
+    ax.legend(**kwargs)
+
+
 def _parse_metrics(metrics_raw: str | dict) -> dict[str, Any]:
     """Parse metrics from JSON string or dict."""
     if isinstance(metrics_raw, dict):
@@ -97,7 +106,7 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
     ax.set_title("Memory Bandwidth by Buffer Size")
     ax.set_xticks([i + width * (len(gpu_names) - 1) / 2 for i in range(len(sizes))])
     ax.set_xticklabels(sizes)
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(gpu_names) * 3)
     ax.grid(axis="y", alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -125,7 +134,7 @@ def _chart_matmul(results: list[dict[str, Any]]) -> str:
     ax.set_xlabel("Matrix Size (N×N)")
     ax.set_ylabel("GFLOPS")
     ax.set_title("Matrix Multiplication Performance")
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(grouped))
     ax.grid(alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -153,7 +162,7 @@ def _chart_tiled_matmul(results: list[dict[str, Any]]) -> str:
     ax.set_xlabel("Matrix Size (N×N)")
     ax.set_ylabel("GFLOPS")
     ax.set_title("Tiled MatMul Performance (Shared Memory)")
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(grouped))
     ax.grid(alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -181,7 +190,7 @@ def _chart_attention(results: list[dict[str, Any]]) -> str:
     ax.set_xlabel("Sequence Length")
     ax.set_ylabel("TFLOPS")
     ax.set_title("Scaled Dot-Product Attention Performance")
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(grouped))
     ax.grid(alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -225,7 +234,7 @@ def _chart_hpl(results: list[dict[str, Any]]) -> str:
     all_sizes = sorted(set(d[1] for d in data))
     ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
     ax.set_xticklabels([str(s) for s in all_sizes])
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(labels))
     ax.grid(axis="y", alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -269,7 +278,7 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
     all_sizes = sorted(set(d[1] for d in data))
     ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
     ax.set_xticklabels([str(s) for s in all_sizes])
-    ax.legend(fontsize=8)
+    _set_legend(ax, len(labels))
     ax.grid(axis="y", alpha=0.3)
 
     return _fig_to_base64(fig)
@@ -307,7 +316,7 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
     ax1.set_xticklabels(names)
     ax1.set_ylabel("Run Count")
     ax1.set_title("Pass / Fail by Benchmark")
-    ax1.legend(fontsize=8)
+    _set_legend(ax1, 2)
     ax1.grid(axis="y", alpha=0.3)
 
     perf_names = []
@@ -330,40 +339,6 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
                 transform=ax2.transAxes, color="gray")
 
     fig.tight_layout()
-    return _fig_to_base64(fig)
-    """Generate GPU comparison bar chart (avg performance per GPU)."""
-    gpu_perf: dict[str, list[float]] = {}
-    for r in results:
-        if not r.get("success"):
-            continue
-        gpu = f"{r['gpu_model']} (GPU {r['gpu_index']})"
-        metrics = _parse_metrics(r.get("metrics", "{}"))
-        # Extract a single performance number per result
-        for kernel_data in metrics.values():
-            if isinstance(kernel_data, dict):
-                for v in kernel_data.values():
-                    if isinstance(v, dict) and "gflops" in v:
-                        gpu_perf.setdefault(gpu, []).append(v["gflops"])
-                    elif isinstance(v, dict) and "tflops" in v:
-                        gpu_perf.setdefault(gpu, []).append(v["tflops"] * 1000)  # normalize to GFLOPS
-
-    if not gpu_perf:
-        return ""
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    names = list(gpu_perf.keys())
-    avgs = [sum(v) / len(v) if v else 0 for v in gpu_perf.values()]
-    bars = ax.barh(names, avgs, color=SERIES_COLORS[:len(names)])
-
-    for bar, val in zip(bars, avgs):
-        max_val = max(avgs) if avgs else 1
-        ax.text(bar.get_width() + max_val * 0.01, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}", va="center", fontsize=9)
-
-    ax.set_xlabel("Average Performance (GFLOPS equiv.)")
-    ax.set_title("GPU Performance Comparison")
-    ax.grid(axis="x", alpha=0.3)
-
     return _fig_to_base64(fig)
 
 
@@ -389,15 +364,20 @@ def generate_report(
     report_title = title or f"nvProbe Report — {latest_run['name']}"
 
     # Generate charts
-    charts = {
-        "bandwidth": _chart_bandwidth(results),
-        "matmul": _chart_matmul(results),
-        "tiled_matmul": _chart_tiled_matmul(results),
-        "attention": _chart_attention(results),
-        "hpl": _chart_hpl(results),
-        "hpcg": _chart_hpcg(results),
-        "summary": _chart_summary(results),
-    }
+    charts: dict[str, str] = {}
+    for name, func in [
+        ("bandwidth", _chart_bandwidth),
+        ("matmul", _chart_matmul),
+        ("tiled_matmul", _chart_tiled_matmul),
+        ("attention", _chart_attention),
+        ("hpl", _chart_hpl),
+        ("hpcg", _chart_hpcg),
+        ("summary", _chart_summary),
+    ]:
+        try:
+            charts[name] = func(results)
+        except Exception:
+            charts[name] = ""
 
     # Copy logo to reports directory
     logo_src = Path(__file__).parent / "nvprobe.svg"
