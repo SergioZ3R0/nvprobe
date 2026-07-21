@@ -83,13 +83,19 @@
         .btn-outline { border: 1px solid var(--border); color: var(--text); }
         .btn-outline:hover { border-color: var(--muted); transform: translateY(-1px); }
 
+        .badge-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 20px;
+        }
         .badge {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
-            margin: 0 4px;
         }
         .badge-py { background: #306998; color: #fff; }
         .badge-cuda { background: var(--green); color: #000; }
@@ -125,6 +131,8 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         .code-block .cmd { color: var(--neon); white-space: nowrap; }
         .code-block .copy-btn {
@@ -250,6 +258,9 @@
         }
         footer a { color: var(--green); text-decoration: none; }
 
+        @media (max-width: 768px) {
+            .badge { font-size: 0.7rem; padding: 3px 10px; }
+        }
         @media (max-width: 640px) {
             header h1 { font-size: 2.4rem; }
             header p { font-size: 1rem; }
@@ -292,7 +303,7 @@
                 benchmark MLPerf inference, compare hardware, and generate interactive
                 HTML reports — all from a single CLI.
             </p>
-            <div style="margin-bottom: 20px;">
+            <div class="badge-wrap">
                 <span class="badge badge-py">Python 3.10+</span>
                 <span class="badge badge-cuda">CUDA 12 / 13</span>
                 <span class="badge badge-hpc">HPL / HPCG</span>
