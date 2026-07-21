@@ -165,55 +165,62 @@ _CPU_FALLBACK_PATTERNS = (
 
 
 def _parse_mlperf_output(output: str) -> dict[str, Any]:
-    """Extract throughput and latency metrics from MLPerf stdout."""
+    """Extract throughput, accuracy and latency from MLPerf stdout.
+
+    Handles the ASCII table format:
+      |  Model   | Scenario | Accuracy | Throughput | Latency (in ms) |
+      | resnet50 | Offline  |   80.0   |  830.439   |        -        |
+    """
     result: dict[str, Any] = {}
-    for line in output.splitlines():
-        lower = line.lower().strip()
+    lines = output.splitlines()
 
-        # Throughput: "Scheduled queries per second = 1234.56" or "qps : 1234.56"
-        if "queries per second" in lower or "qps" in lower:
-            for part in line.replace("=", " ").replace(":", " ").split():
-                try:
-                    result["queries_per_second"] = float(part)
-                except ValueError:
-                    continue
+    # Look for the ASCII results table
+    in_table = False
+    col_headers: list[str] = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("+") and stripped.endswith("+"):
+            if not in_table and i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if next_line.startswith("|") and "Model" in next_line:
+                    in_table = True
+                    col_headers = [h.strip() for h in next_line.split("|")[1:-1]]
+            elif in_table and i + 1 < len(lines):
+                data_line = lines[i + 1].strip()
+                if data_line.startswith("|"):
+                    cols = [c.strip() for c in data_line.split("|")[1:-1]]
+                    if len(cols) == len(col_headers):
+                        for h, v in zip(col_headers, cols):
+                            h_lower = h.lower()
+                            if "throughput" in h_lower:
+                                try:
+                                    result["queries_per_second"] = float(v)
+                                except ValueError:
+                                    pass
+                            elif "accuracy" in h_lower:
+                                try:
+                                    result["accuracy"] = float(v.rstrip("%"))
+                                except ValueError:
+                                    pass
+                            elif "latency" in h_lower:
+                                if v not in ("", "-"):
+                                    try:
+                                        result["latency_ms"] = float(v)
+                                    except ValueError:
+                                        pass
+                # Table ended
+                break
 
-        # Latency percentiles
-        for pctl in ("99", "95", "90", "50"):
-            pat = f"{pctl}th percentile latency" if pctl != "50" else "50th percentile latency"
-            if pat in lower or f"p{pctl}" in lower:
+    # Fallback: try generic patterns if table not found
+    if "queries_per_second" not in result:
+        for line in lines:
+            lower = line.lower().strip()
+            if "queries per second" in lower or "qps" in lower:
                 for part in line.replace("=", " ").replace(":", " ").split():
                     try:
-                        val = float(part)
-                        if val < 1e6:
-                            result[f"latency_p{pctl}"] = val
+                        result["queries_per_second"] = float(part)
                     except ValueError:
                         continue
-
-        # Mean / max latency
-        if "mean latency" in lower or "average latency" in lower:
-            for part in line.replace("=", " ").replace(":", " ").split():
-                try:
-                    val = float(part)
-                    if val < 1e6:
-                        result["latency_mean"] = val
-                except ValueError:
-                    continue
-        if "max latency" in lower:
-            for part in line.replace("=", " ").replace(":", " ").split():
-                try:
-                    val = float(part)
-                    if val < 1e6:
-                        result["latency_max"] = val
-                except ValueError:
-                    continue
-
-        # Samples / queries completed
-        if "scheduled" in lower and "completed" in lower and "=" in line:
-            for part in line.split("="):
-                part = part.strip()
-                if part.isdigit():
-                    result.setdefault("completed_queries", int(part))
 
     return result
 

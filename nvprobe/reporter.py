@@ -421,8 +421,8 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
 
 
 def _chart_mlperf(results: list[dict[str, Any]]) -> str:
-    """Generate MLPerf throughput bar chart."""
-    data: list[tuple[str, float]] = []
+    """Generate MLPerf throughput bar chart with accuracy annotation."""
+    data: list[tuple[str, float, float | None]] = []  # (label, qps, accuracy)
     for r in results:
         if not r.get("success"):
             continue
@@ -434,7 +434,8 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
             label = f"GPU {r['gpu_index']} ({r['gpu_model']})"
             scenario = metrics.get("scenario", "?")
             model = metrics.get("model", "?")
-            data.append((f"{label} {model} {scenario}", float(qps)))
+            acc = metrics.get("accuracy")
+            data.append((f"{label} {model} {scenario}", float(qps), float(acc) if acc else None))
 
     if not data:
         return ""
@@ -444,14 +445,17 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
     vals = [d[1] for d in data]
 
     bars = ax.barh(range(len(labels)), vals, color=SERIES_COLORS[:len(labels)])
-    for bar, val in zip(bars, vals):
+    for bar, val, (_, _, acc) in zip(bars, vals, data):
+        txt = f"{val:.1f}"
+        if acc is not None:
+            txt += f"  ({acc:.1f}%)"
         ax.text(bar.get_width() + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}", va="center", fontsize=9)
+                txt, va="center", fontsize=9)
 
     ax.set_yticks(range(len(labels)))
     ax.set_yticklabels(labels, fontsize=8)
-    ax.set_xlabel("Queries per Second")
-    ax.set_title("MLPerf Inference — Throughput")
+    ax.set_xlabel("Throughput (queries / second)")
+    ax.set_title("MLPerf Inference — Throughput & Accuracy")
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     return _fig_to_base64(fig)
