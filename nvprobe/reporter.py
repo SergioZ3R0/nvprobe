@@ -446,20 +446,23 @@ def _render_html(
         gpu_rows += f"<tr><td>{g['index']}</td><td>{g['model']}</td><td>{g['memory_total_mb']} MB</td></tr>\n"
 
     chart_html = ""
-    if charts.get("summary"):
-        chart_html += f'<div class="chart"><img src="{charts["summary"]}" alt="Summary"></div>\n'
-    if charts.get("bandwidth"):
-        chart_html += f'<div class="chart"><img src="{charts["bandwidth"]}" alt="Bandwidth"></div>\n'
-    if charts.get("matmul"):
-        chart_html += f'<div class="chart"><img src="{charts["matmul"]}" alt="Matmul"></div>\n'
-    if charts.get("tiled_matmul"):
-        chart_html += f'<div class="chart"><img src="{charts["tiled_matmul"]}" alt="Tiled Matmul"></div>\n'
-    if charts.get("attention"):
-        chart_html += f'<div class="chart"><img src="{charts["attention"]}" alt="Attention"></div>\n'
-    if charts.get("hpl"):
-        chart_html += f'<div class="chart"><img src="{charts["hpl"]}" alt="HPL"></div>\n'
-    if charts.get("hpcg"):
-        chart_html += f'<div class="chart"><img src="{charts["hpcg"]}" alt="HPCG"></div>\n'
+    _CHART_NAMES = [
+        ("summary", "Summary Dashboard"),
+        ("bandwidth", "Memory Bandwidth"),
+        ("matmul", "Matrix Multiplication"),
+        ("tiled_matmul", "Tiled MatMul (Shared Memory)"),
+        ("attention", "Scaled Dot-Product Attention"),
+        ("hpl", "HPL — High Performance Linpack"),
+        ("hpcg", "HPCG — Conjugate Gradients"),
+    ]
+    for key, label in _CHART_NAMES:
+        if charts.get(key):
+            chart_html += (
+                f'<details class="chart">'
+                f'<summary>{label}</summary>'
+                f'<img src="{charts[key]}" alt="{label}">'
+                f'</details>\n'
+            )
 
     bench_tables = _render_benchmark_tables(results)
 
@@ -526,8 +529,12 @@ tr:hover td {{ background: var(--accent-light); }}
 .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }}
 .badge-ok {{ background: #D4EDDA; color: #155724; }}
 .badge-fail {{ background: #F8D7DA; color: #721C24; }}
-.chart {{ margin: 1.5rem 0; text-align: center; }}
-.chart img {{ max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }}
+.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;
+    background: var(--surface); user-select: none; }}
+.chart summary:hover {{ background: var(--accent-light); }}
+.chart[open] summary {{ border-bottom: 1px solid var(--border); }}
+.chart img {{ max-width: 100%; display: block; padding: 1rem; box-sizing: border-box; }}
 footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
     color: var(--muted); font-size: 0.75rem; text-align: center; }}
 </style>
@@ -669,7 +676,7 @@ def _render_comparison_html(
         ax.grid(axis="y", alpha=0.3)
         chart_b64 = _fig_to_base64(fig)
 
-    chart_html = f'<div class="chart"><img src="{chart_b64}" alt="Comparison"></div>' if chart_b64 else ""
+    chart_html = f'<details class="chart"><summary>Performance Comparison</summary><img src="{chart_b64}" alt="Comparison"></details>' if chart_b64 else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -692,8 +699,12 @@ table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; background: var
     border-radius: 8px; overflow: hidden; }}
 th {{ background: var(--accent); color: #fff; padding: 0.6rem; text-align: left; font-size: 0.85rem; }}
 td {{ padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }}
-.chart {{ margin: 1.5rem 0; text-align: center; }}
-.chart img {{ max-width: 100%; border-radius: 8px; }}
+.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }}
+.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;
+    background: var(--surface); user-select: none; }}
+.chart summary:hover {{ background: var(--accent-light); }}
+.chart[open] summary {{ border-bottom: 1px solid var(--border); }}
+.chart img {{ max-width: 100%; display: block; padding: 1rem; box-sizing: border-box; }}
 .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }}
 .badge-ok {{ background: #D4EDDA; color: #155724; }}
 .badge-fail {{ background: #F8D7DA; color: #721C24; }}
