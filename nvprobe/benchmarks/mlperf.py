@@ -164,6 +164,60 @@ _CPU_FALLBACK_PATTERNS = (
 )
 
 
+def _parse_mlperf_output(output: str) -> dict[str, Any]:
+    """Extract throughput and latency metrics from MLPerf stdout."""
+    result: dict[str, Any] = {}
+    for line in output.splitlines():
+        lower = line.lower().strip()
+
+        # Throughput: "Scheduled queries per second = 1234.56" or "qps : 1234.56"
+        if "queries per second" in lower or "qps" in lower:
+            for part in line.replace("=", " ").replace(":", " ").split():
+                try:
+                    result["queries_per_second"] = float(part)
+                except ValueError:
+                    continue
+
+        # Latency percentiles
+        for pctl in ("99", "95", "90", "50"):
+            pat = f"{pctl}th percentile latency" if pctl != "50" else "50th percentile latency"
+            if pat in lower or f"p{pctl}" in lower:
+                for part in line.replace("=", " ").replace(":", " ").split():
+                    try:
+                        val = float(part)
+                        if val < 1e6:
+                            result[f"latency_p{pctl}"] = val
+                    except ValueError:
+                        continue
+
+        # Mean / max latency
+        if "mean latency" in lower or "average latency" in lower:
+            for part in line.replace("=", " ").replace(":", " ").split():
+                try:
+                    val = float(part)
+                    if val < 1e6:
+                        result["latency_mean"] = val
+                except ValueError:
+                    continue
+        if "max latency" in lower:
+            for part in line.replace("=", " ").replace(":", " ").split():
+                try:
+                    val = float(part)
+                    if val < 1e6:
+                        result["latency_max"] = val
+                except ValueError:
+                    continue
+
+        # Samples / queries completed
+        if "scheduled" in lower and "completed" in lower and "=" in line:
+            for part in line.split("="):
+                part = part.strip()
+                if part.isdigit():
+                    result.setdefault("completed_queries", int(part))
+
+    return result
+
+
 def _detect_cpu_fallback(text: str) -> bool:
     """Return True if *text* indicates onnxruntime fell back to CPU."""
     lower = text.lower()
@@ -278,6 +332,13 @@ class MlperfBenchmark(BaseBenchmark):
                 "framework": framework,
                 "scenario": scenario,
             }
+            parsed = _parse_mlperf_output(full_output)
+            if parsed.get("queries_per_second"):
+                metrics["queries_per_second"] = parsed["queries_per_second"]
+            for k in ("latency_p99", "latency_p95", "latency_p90", "latency_p50",
+                      "latency_mean", "latency_max", "completed_queries"):
+                if k in parsed:
+                    metrics[k] = parsed[k]
             if compat_warning:
                 metrics["_compat_warning"] = compat_warning
             if cpu_warning:

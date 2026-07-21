@@ -420,6 +420,43 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
     return _fig_to_base64(fig)
 
 
+def _chart_mlperf(results: list[dict[str, Any]]) -> str:
+    """Generate MLPerf throughput bar chart."""
+    data: list[tuple[str, float]] = []
+    for r in results:
+        if not r.get("success"):
+            continue
+        if r["benchmark"] != "mlperf":
+            continue
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        qps = metrics.get("queries_per_second")
+        if qps:
+            label = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+            scenario = metrics.get("scenario", "?")
+            model = metrics.get("model", "?")
+            data.append((f"{label} {model} {scenario}", float(qps)))
+
+    if not data:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(10, max(3, len(data) * 0.4)))
+    labels = [d[0] for d in data]
+    vals = [d[1] for d in data]
+
+    bars = ax.barh(range(len(labels)), vals, color=SERIES_COLORS[:len(labels)])
+    for bar, val in zip(bars, vals):
+        ax.text(bar.get_width() + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
+                f"{val:.1f}", va="center", fontsize=9)
+
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_xlabel("Queries per Second")
+    ax.set_title("MLPerf Inference — Throughput")
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    return _fig_to_base64(fig)
+
+
 def _chart_summary(results: list[dict[str, Any]]) -> str:
     """Generate a summary dashboard: pass/fail per benchmark + avg performance."""
     bench_stats: dict[str, dict[str, Any]] = {}
@@ -508,6 +545,7 @@ def generate_report(
         ("attention", _chart_attention),
         ("hpl", _chart_hpl),
         ("hpcg", _chart_hpcg),
+        ("mlperf", _chart_mlperf),
         ("summary", _chart_summary),
     ]:
         try:
@@ -590,6 +628,7 @@ def _render_html(
         ("attention", "Scaled Dot-Product Attention"),
         ("hpl", "HPL — High Performance Linpack"),
         ("hpcg", "HPCG — Conjugate Gradients"),
+        ("mlperf", "MLPerf Inference — Throughput"),
     ]
     for key, label in _CHART_NAMES:
         content = charts.get(key)
