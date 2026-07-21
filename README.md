@@ -23,8 +23,6 @@ pip install nvprobe && nvprobe setup && nvprobe run --local
 
 ## Features
 
-| | | |
-|---|---|---|
 | **Bandwidth** | **MatMul / Attention** | **Conv2D** |
 | H2D / D2H / D2D across buffer sizes | fp32, fp16, int8 custom CUDA kernels | 2D convolution benchmarks |
 | **HPL** (FP64 Linpack) | **HPCG** | **MLPerf Inference** |
