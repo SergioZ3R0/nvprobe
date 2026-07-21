@@ -232,6 +232,7 @@ class MlperfBenchmark(BaseBenchmark):
             "--device=cuda",
             f"--test_query_count={test_query_count}",
             "--quiet",
+            "--env.PIP_USER=1",
         ])
         if custom_batch_size is not None:
             cmd.append(f"--batch_size={custom_batch_size}")
@@ -249,6 +250,7 @@ class MlperfBenchmark(BaseBenchmark):
         try:
             env = subprocess_env()
             env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+            env["PIP_USER"] = "1"
             if cudnn_lib:
                 env["CUDNN_ROOT"] = cudnn_root
                 env["MLC_CUDA_PATH_LIB_CUDNN"] = cudnn_lib
@@ -261,8 +263,6 @@ class MlperfBenchmark(BaseBenchmark):
                 cmd, capture_output=True, text=True, timeout=7200, check=True,
                 env=env,
             )
-
-            # Fix 3: detect CPU fallback even when exit code is 0
             full_output = proc.stdout + "\n" + proc.stderr
             cpu_warning = ""
             if _detect_cpu_fallback(full_output):
@@ -409,5 +409,6 @@ pip install --user loguru 2>/dev/null || true
     --execution_mode={mode} \\
     --device=cuda \\
     --test_query_count={test_query_count} \\
+    --env.PIP_USER=1 \\
 {batch_line}    --quiet
 """

@@ -199,88 +199,137 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
 </details>"""
 
 
-def _chart_matmul(results: list[dict[str, Any]]) -> str:
-    """Generate matmul GFLOPS scaling chart."""
-    grouped: dict[str, dict] = {}
+def _moving_average(vals: list[float], window: int) -> list[float]:
+    """Compute simple moving average (centered)."""
+    if len(vals) < window or window < 2:
+        return list(vals)
+    half = window // 2
+    result = []
+    for i in range(len(vals)):
+        start = max(0, i - half)
+        end = min(len(vals), i + half + 1)
+        result.append(sum(vals[start:end]) / (end - start))
+    return result
+
+
+def _plotly_line_chart(
+    results: list[dict[str, Any]],
+    benchmark_key: str,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    value_key: str = "gflops",
+) -> str:
+    """Interactive Plotly line chart with Precision + GPU dropdowns, smoothing, and range slider."""
+    import plotly.graph_objects as go
+    import plotly.offline
+
+    raw: list[tuple[int, str, dict]] = []  # (gpu_idx, precision, data_dict)
     for r in results:
         metrics = _parse_metrics(r.get("metrics", "{}"))
-        matmul = metrics.get("matmul", {})
-        if matmul:
-            key = f"GPU {r['gpu_index']} ({r['gpu_model']}) — {r['precision']}"
-            grouped[key] = matmul
+        data = metrics.get(benchmark_key, {})
+        if data:
+            raw.append((r["gpu_index"], r["precision"], data))
 
-    if not grouped:
+    if not raw:
         return ""
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for i, (label, data) in enumerate(grouped.items()):
-        sizes = [int(k) for k in data.keys()]
-        gflops = [v.get("gflops", 0) for v in data.values()]
-        ax.plot(sizes, gflops, "o-", label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)], linewidth=2, markersize=6)
+    all_sizes = sorted(set(int(k) for _, _, d in raw for k in d.keys()))
+    gpu_indices = sorted(set(gi for gi, _, _ in raw))
+    precisions = sorted(set(p for _, p, _ in raw))
 
-    ax.set_xlabel("Matrix Size (N×N)")
-    ax.set_ylabel("GFLOPS")
-    ax.set_title("Matrix Multiplication Performance")
-    _set_legend(ax, len(grouped))
-    ax.grid(alpha=0.3)
+    fig = go.Figure()
+    trace_meta: list[list[int | str]] = []  # [gpu_idx, precision]
 
-    return _fig_to_base64(fig)
+    for i, (gpu_idx, prec, data) in enumerate(raw):
+        sizes = sorted(int(k) for k in data.keys())
+        vals = [data[str(s)].get(value_key, 0) for s in sizes]
+        smooth = _moving_average(vals, max(3, len(vals) // 8))
+        color = SERIES_COLORS[i % len(SERIES_COLORS)]
+        fig.add_trace(go.Scatter(
+            x=sizes,
+            y=smooth,
+            mode="lines+markers",
+            name=f"GPU {gpu_idx} ({prec})",
+            legendgroup=prec,
+            line=dict(width=2, color=color),
+            marker=dict(size=4, opacity=0.6, color=color),
+            hovertemplate=f"%{{x}}<br>%{{y:.1f}} {ylabel}<extra>GPU {gpu_idx} {prec}</extra>",
+        ))
+        trace_meta.append([gpu_idx, prec])
+
+    n_traces = len(trace_meta)
+
+    def _vis_precision(p: str) -> list[bool]:
+        return [pm == p for _, pm in trace_meta]
+
+    def _vis_gpu(gi: int) -> list[bool]:
+        return [gpi == gi for gpi, _ in trace_meta]
+
+    gpu_buttons = [dict(label="All GPUs", method="update", args=[{"visible": [True] * n_traces}])]
+    for gi in gpu_indices:
+        gpu_buttons.append(dict(label=f"GPU {gi}", method="update", args=[{"visible": _vis_gpu(gi)}]))
+
+    prec_buttons = [dict(label="All", method="update", args=[{"visible": [True] * n_traces}])]
+    for p in precisions:
+        prec_buttons.append(dict(label=p, method="update", args=[{"visible": _vis_precision(p)}]))
+
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title=xlabel,
+        yaxis_title=ylabel,
+        hovermode="x unified",
+        legend=dict(font=dict(size=10)),
+        template="none",
+        margin=dict(l=60, r=20, t=100, b=60),
+        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"),
+        xaxis=dict(rangeslider=dict(visible=True)),
+        updatemenus=[
+            dict(
+                buttons=gpu_buttons, direction="down", showactive=True, active=0,
+                x=0.02, y=1.2, xanchor="left", yanchor="bottom",
+                bgcolor="#f0f0f0", bordercolor="#ccc", font=dict(size=12),
+            ),
+            dict(
+                buttons=prec_buttons, direction="down", showactive=True, active=0,
+                x=0.22, y=1.2, xanchor="left", yanchor="bottom",
+                bgcolor="#f0f0f0", bordercolor="#ccc", font=dict(size=12),
+            ),
+        ],
+        annotations=[
+            dict(text="GPU", x=0.0, y=1.17, xref="paper", yref="paper",
+                 showarrow=False, font=dict(size=12)),
+            dict(text="Precision", x=0.20, y=1.17, xref="paper", yref="paper",
+                 showarrow=False, font=dict(size=12)),
+        ],
+    )
+
+    plot_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type="div")
+    return f"""<details class="chart" open>
+<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);
+  cursor:pointer;user-select:none;"
+  ontoggle="if(this.parentElement.open){{var el=this.parentElement.querySelector('.js-plotly-plot');if(el)Plotly.Plots.resize(el);}}">
+  {title}
+</summary>
+<div style="min-height:400px;width:100%;padding:0.5rem;box-sizing:border-box;">
+{plot_div}
+</div>
+</details>"""
+
+
+def _chart_matmul(results: list[dict[str, Any]]) -> str:
+    return _plotly_line_chart(results, "matmul", "Matrix Multiplication Performance",
+                              "Matrix Size (N×N)", "GFLOPS", "gflops")
 
 
 def _chart_tiled_matmul(results: list[dict[str, Any]]) -> str:
-    """Generate tiled matmul GFLOPS scaling chart."""
-    grouped: dict[str, dict] = {}
-    for r in results:
-        metrics = _parse_metrics(r.get("metrics", "{}"))
-        tiled = metrics.get("tiled_matmul", {})
-        if tiled:
-            key = f"GPU {r['gpu_index']} ({r['gpu_model']}) — {r['precision']}"
-            grouped[key] = tiled
-
-    if not grouped:
-        return ""
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for i, (label, data) in enumerate(grouped.items()):
-        sizes = [int(k) for k in data.keys()]
-        gflops = [v.get("gflops", 0) for v in data.values()]
-        ax.plot(sizes, gflops, "^-", label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)], linewidth=2, markersize=6)
-
-    ax.set_xlabel("Matrix Size (N×N)")
-    ax.set_ylabel("GFLOPS")
-    ax.set_title("Tiled MatMul Performance (Shared Memory)")
-    _set_legend(ax, len(grouped))
-    ax.grid(alpha=0.3)
-
-    return _fig_to_base64(fig)
+    return _plotly_line_chart(results, "tiled_matmul", "Tiled MatMul Performance (Shared Memory)",
+                              "Matrix Size (N×N)", "GFLOPS", "gflops")
 
 
 def _chart_attention(results: list[dict[str, Any]]) -> str:
-    """Generate attention TFLOPS scaling chart."""
-    grouped: dict[str, dict] = {}
-    for r in results:
-        metrics = _parse_metrics(r.get("metrics", "{}"))
-        attention = metrics.get("attention", {})
-        if attention:
-            key = f"GPU {r['gpu_index']} ({r['gpu_model']}) — {r['precision']}"
-            grouped[key] = attention
-
-    if not grouped:
-        return ""
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for i, (label, data) in enumerate(grouped.items()):
-        sizes = [int(k) for k in data.keys()]
-        tflops = [v.get("tflops", 0) for v in data.values()]
-        ax.plot(sizes, tflops, "s-", label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)], linewidth=2, markersize=6)
-
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("TFLOPS")
-    ax.set_title("Scaled Dot-Product Attention Performance")
-    _set_legend(ax, len(grouped))
-    ax.grid(alpha=0.3)
-
-    return _fig_to_base64(fig)
+    return _plotly_line_chart(results, "attention", "Scaled Dot-Product Attention Performance",
+                              "Sequence Length", "TFLOPS", "tflops")
 
 
 def _chart_hpl(results: list[dict[str, Any]]) -> str:
@@ -611,7 +660,8 @@ h3 {{ font-size: 1.05rem; margin: 1.2rem 0 0.5rem; }}
 .subtitle {{ color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }}
 table {{ width: 100%; border-collapse: collapse; margin: 0.8rem 0 1.5rem; background: var(--surface);
     border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
-th {{ background: var(--accent); color: #fff; padding: 0.6rem 0.8rem; text-align: left; font-size: 0.85rem; }}
+th {{ background: var(--accent); color: #fff; padding: 0.6rem 0.8rem; text-align: left; font-size: 0.85rem;
+    position: sticky; top: 0; z-index: 1; }}
 td {{ padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }}
 tr:hover td {{ background: var(--accent-light); }}
 .env-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; margin: 1rem 0; }}
@@ -628,6 +678,9 @@ tr:hover td {{ background: var(--accent-light); }}
 .chart summary:hover {{ background: var(--accent-light); }}
 .chart[open] summary {{ border-bottom: 1px solid var(--border); }}
 .chart img {{ max-width: 100%; display: block; padding: 1rem; box-sizing: border-box; }}
+.metrics-details summary {{ font-size:0.8rem;cursor:pointer;color:var(--accent); }}
+.metrics-details[open] summary {{ margin-bottom:0.3rem; }}
+.metrics-content {{ font-size:0.75rem;word-break:break-all;max-height:200px;overflow-y:auto; }}
 footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
     color: var(--muted); font-size: 0.75rem; text-align: center; }}
 </style>
@@ -689,9 +742,18 @@ def _render_benchmark_tables(results: list[dict[str, Any]]) -> str:
             status_badge = '<span class="badge badge-ok">OK</span>' if r["success"] else '<span class="badge badge-fail">FAIL</span>'
             metrics = _parse_metrics(r.get("metrics", "{}"))
             metrics_str = _format_metrics(metrics)
+            if len(metrics_str) > 100:
+                metrics_cell = (
+                    f'<details class="metrics-details">'
+                    f'<summary>View Raw Metrics</summary>'
+                    f'<div class="metrics-content">{metrics_str}</div>'
+                    f'</details>'
+                )
+            else:
+                metrics_cell = metrics_str
             html += f"<tr><td>{r['gpu_index']}</td><td>{r['gpu_model']}</td><td>{r['precision']}</td>"
             html += f"<td>{r['batch_size']}</td><td>{status_badge}</td><td>{r.get('elapsed_seconds', '')}</td>"
-            html += f"<td style='font-size:0.8rem'>{metrics_str}</td></tr>\n"
+            html += f"<td style='font-size:0.8rem'>{metrics_cell}</td></tr>\n"
         html += "</table>\n"
     return html
 
