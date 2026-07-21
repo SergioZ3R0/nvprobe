@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -79,6 +80,96 @@ def _register_cudnn_once(mlperf_cmd: str, cudnn_root: str) -> None:
         pass
 
 
+def _clear_mlc_cuda_cache(mlperf_cmd: str) -> None:
+    """Clear MLC's cached CUDA detection so mlcr re-detects the real CUDA version."""
+    try:
+        subprocess.run(
+            [mlperf_cmd, "rm", "cache", "--tags=get,cuda", "-f"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except Exception:
+        pass
+
+
+def _detect_cuda_major() -> int | None:
+    """Detect CUDA major version from nvcc or nvidia-smi."""
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        try:
+            out = subprocess.run(
+                [nvcc, "--version"], capture_output=True, text=True, check=True,
+            )
+            for line in out.stdout.splitlines():
+                if "release" in line:
+                    ver = line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                    return int(ver.split(".")[0])
+        except Exception:
+            pass
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            capture_output=True, text=True, check=True,
+        )
+        parts = out.stdout.strip().split(".")
+        if parts:
+            major = int(parts[0])
+            if major >= 535:
+                return 12
+            elif major >= 525:
+                return 11
+            return 11
+    except Exception:
+        pass
+    return None
+
+
+def _check_cudnn_cuda_compat() -> str:
+    """Check if installed cuDNN CUDA variant matches system CUDA version.
+
+    Returns a warning string if mismatch detected, empty string otherwise.
+    """
+    cuda_major = _detect_cuda_major()
+    if cuda_major is None:
+        return ""
+    cudnn_cuda: int | None = None
+    try:
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata["Name"] or ""
+            if name.startswith("nvidia-cudnn-cu"):
+                suffix = name.split("nvidia-cudnn-cu")[-1]
+                try:
+                    cudnn_cuda = int(suffix)
+                except ValueError:
+                    pass
+                break
+    except Exception:
+        pass
+    if cudnn_cuda is not None and cudnn_cuda != cuda_major:
+        return (
+            f"WARNING: nvidia-cudnn-cu{cudnn_cuda} is installed but system CUDA "
+            f"version is {cuda_major}. This may cause onnxruntime to fall back "
+            f"to CPU. Install: pip install --user nvidia-cudnn-cu{cuda_major}"
+        )
+    return ""
+
+
+_CPU_FALLBACK_PATTERNS = (
+    "failed to create cudaexecutionprovider",
+    "libcudnn.so.",  # catches libcudnn.so.9, libcudnn.so.8, etc.
+    "cuda execution provider is not available",
+    "onnxruntime.*cuda.*not.*available",
+    "fallback.*cpu",
+    "could not load library.*cudnn",
+    "cuda error",
+)
+
+
+def _detect_cpu_fallback(text: str) -> bool:
+    """Return True if *text* indicates onnxruntime fell back to CPU."""
+    lower = text.lower()
+    return any(p in lower for p in _CPU_FALLBACK_PATTERNS)
+
+
 class MlperfBenchmark(BaseBenchmark):
     """Wrapper around MLPerf inference via cmx4mlperf."""
 
@@ -122,6 +213,12 @@ class MlperfBenchmark(BaseBenchmark):
 
         _ensure_mlperf_deps()
 
+        # Fix 1: clear MLC's stale CUDA cache before invoking mlcr
+        _clear_mlc_cuda_cache(mlperf_cmd)
+
+        # Fix 2: check cuDNN vs system CUDA version compatibility
+        compat_warning = _check_cudnn_cuda_compat()
+
         gpu_model = _detect_gpu_model(gpu_index)
 
         cmd = self._build_cmd(mlperf_cmd, scenario, mode=mode)
@@ -164,17 +261,35 @@ class MlperfBenchmark(BaseBenchmark):
                 cmd, capture_output=True, text=True, timeout=7200, check=True,
                 env=env,
             )
+
+            # Fix 3: detect CPU fallback even when exit code is 0
+            full_output = proc.stdout + "\n" + proc.stderr
+            cpu_warning = ""
+            if _detect_cpu_fallback(full_output):
+                cpu_warning = (
+                    "WARNING: MLPerf benchmark likely ran on CPU, not GPU. "
+                    "onnxruntime's CUDAExecutionProvider failed to load "
+                    "(check cuDNN installation / CUDA version compatibility). "
+                    "The reported performance numbers are for CPU, not GPU."
+                )
+
+            metrics: dict[str, Any] = {
+                "model": model,
+                "framework": framework,
+                "scenario": scenario,
+            }
+            if compat_warning:
+                metrics["_compat_warning"] = compat_warning
+            if cpu_warning:
+                metrics["_cpu_warning"] = cpu_warning
+
             return BenchmarkResult(
                 benchmark=self.name,
                 gpu_model=gpu_model,
                 gpu_index=gpu_index,
                 precision=precision,
                 batch_size=batch_size,
-                metrics={
-                    "model": model,
-                    "framework": framework,
-                    "scenario": scenario,
-                },
+                metrics=metrics,
                 raw_output=proc.stdout,
             )
         except FileNotFoundError:
@@ -235,6 +350,18 @@ class MlperfBenchmark(BaseBenchmark):
                 )
             elif "Permission denied" in detail:
                 detail += "\n\nFix: pip install --user loguru"
+
+            # Append compat warning if present
+            full_output = stdout + "\n" + stderr
+            if _detect_cpu_fallback(full_output) and compat_warning:
+                detail = compat_warning + "\n\n" + detail
+            elif _detect_cpu_fallback(full_output):
+                detail = (
+                    "WARNING: MLPerf benchmark likely ran on CPU, not GPU.\n"
+                    "  onnxruntime's CUDAExecutionProvider failed to load.\n\n"
+                ) + detail
+            elif compat_warning:
+                detail = compat_warning + "\n\n" + detail
 
             return BenchmarkResult(
                 benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
