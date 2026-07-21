@@ -132,8 +132,10 @@
             justify-content: space-between;
             gap: 12px;
             max-width: 100%;
+            min-width: 0;
             box-sizing: border-box;
         }
+        .code-block > * { min-width: 0; }
         .code-block .cmd { color: var(--neon); white-space: nowrap; }
         .code-block .copy-btn {
             background: none;
