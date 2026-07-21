@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/v/nvprobe?style=flat&label=PyPI" alt="PyPI"></a>
+  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/badge/PyPI-3775A9?style=flat&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/pyversions/nvprobe?style=flat&label=" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat" alt="License"></a>
   <img src="https://img.shields.io/badge/CUDA-12%20%7C%2013-76b900?style=flat&logo=nvidia" alt="CUDA">
