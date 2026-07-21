@@ -75,10 +75,9 @@ def _extract_val(v: Any, key: str = "mean") -> float:
 
 
 def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
-    """Generate interactive bandwidth chart with Plotly (GPU + transfer type dropdowns)."""
-    import json as _json
+    """Generate interactive bandwidth chart with Plotly updatemenus."""
     import plotly.graph_objects as go
-    import plotly.utils
+    import plotly.offline
 
     grouped: dict[str, dict] = {}
     for r in results:
@@ -118,12 +117,27 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
                 name=f"{gpu} {cname}",
                 legendgroup=cname,
                 marker_color=palette[i % len(palette)],
+                visible=(ttype == "h2d"),
                 hovertemplate="%{x} MB<br>%{y:.1f} GB/s<extra>" + cname + " — " + gpu + "</extra>",
             ))
             trace_info.append([i, ttype])
 
     n_gpus = len(gpu_names)
     n_traces = len(trace_info)
+
+    def _vis_gpu(gpu_idx: int) -> list[bool]:
+        return [gi == gpu_idx for gi, _ in trace_info]
+
+    def _vis_transfer(ttype: str) -> list[bool]:
+        return [tt == ttype for _, tt in trace_info]
+
+    gpu_buttons = [dict(label="All GPUs", method="update", args=[{"visible": [True] * n_traces}])]
+    for i in range(n_gpus):
+        gpu_buttons.append(dict(label=f"GPU {i}", method="update", args=[{"visible": _vis_gpu(i)}]))
+
+    transfer_buttons = [dict(label="All", method="update", args=[{"visible": [True] * n_traces}])]
+    for ttype, label in [("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]:
+        transfer_buttons.append(dict(label=label, method="update", args=[{"visible": _vis_transfer(ttype)}]))
 
     fig.update_layout(
         barmode="group",
@@ -133,52 +147,56 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
         hovermode="x unified",
         legend=dict(font=dict(size=10)),
         template="none",
-        margin=dict(l=60, r=20, t=60, b=60),
+        margin=dict(l=60, r=20, t=100, b=60),
         font=dict(family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"),
+        updatemenus=[
+            dict(
+                buttons=gpu_buttons,
+                direction="down",
+                showactive=True,
+                active=0,
+                x=0.02,
+                y=1.2,
+                xanchor="left",
+                yanchor="bottom",
+                bgcolor="#f0f0f0",
+                bordercolor="#ccc",
+                font=dict(size=12),
+            ),
+            dict(
+                buttons=transfer_buttons,
+                direction="down",
+                showactive=True,
+                active=1,
+                x=0.22,
+                y=1.2,
+                xanchor="left",
+                yanchor="bottom",
+                bgcolor="#f0f0f0",
+                bordercolor="#ccc",
+                font=dict(size=12),
+            ),
+        ],
+        annotations=[
+            dict(text="GPU", x=0.0, y=1.17, xref="paper", yref="paper",
+                 showarrow=False, font=dict(size=12)),
+            dict(text="Transfer", x=0.20, y=1.17, xref="paper", yref="paper",
+                 showarrow=False, font=dict(size=12)),
+        ],
     )
 
-    fig_json = _json.dumps(fig.to_plotly_json(), cls=plotly.utils.PlotlyJSONEncoder)
-    trace_info_json = _json.dumps(trace_info)
+    plot_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type="div")
 
-    options_gpu = '<option value="-1">All GPUs</option>'
-    options_gpu += "".join(f'<option value="{i}">GPU {i}</option>' for i in range(n_gpus))
-    return f"""<div class="chart" style="padding:0;">
-<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);cursor:pointer;user-select:none;"
-  onclick="var d=this.parentElement;d.open=!d.open;if(d.open){{var el=document.getElementById('bw-chart');if(el&&el.layout)Plotly.Plots.resize(el);}}">
+    return f"""<details class="chart" open>
+<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);
+  cursor:pointer;user-select:none;"
+  ontoggle="if(this.parentElement.open){{var el=this.parentElement.querySelector('.js-plotly-plot');if(el)Plotly.Plots.resize(el);}}">
   Memory Bandwidth
 </summary>
-<div style="padding:0.75rem 1rem 0;">
-  <label style="font-weight:600;font-size:0.85rem;margin-right:1rem;">
-    GPU:
-    <select id="bw-gpu" onchange="updateBW()" style="margin-left:0.3rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;">
-      {options_gpu}
-    </select>
-  </label>
-  <label style="font-weight:600;font-size:0.85rem;">
-    Transfer:
-    <select id="bw-transfer" onchange="updateBW()" style="margin-left:0.3rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;">
-      <option value="all">All</option>
-      <option value="h2d">H2D</option>
-      <option value="d2h">D2H</option>
-      <option value="d2d">D2D</option>
-    </select>
-  </label>
+<div style="min-height:500px;width:100%;padding:0.5rem;box-sizing:border-box;">
+{plot_div}
 </div>
-<div id="bw-chart" style="padding:0 0.5rem 0.5rem;"></div>
-<script>
-var bwData = {fig_json};
-var bwMeta = {trace_info_json};
-Plotly.newPlot('bw-chart', bwData.data, bwData.layout, {{responsive: true, displayModeBar: false}});
-function updateBW() {{
-  var gpu = parseInt(document.getElementById('bw-gpu').value);
-  var transfer = document.getElementById('bw-transfer').value;
-  var vis = bwMeta.map(function(m) {{
-    return (gpu === -1 || m[0] === gpu) && (transfer === 'all' || m[1] === transfer);
-  }});
-  Plotly.restyle('bw-chart', 'visible', vis);
-}}
-</script>
-</div>"""
+</details>"""
 
 
 def _chart_matmul(results: list[dict[str, Any]]) -> str:
@@ -528,7 +546,7 @@ def _render_html(
         content = charts.get(key)
         if not content:
             continue
-        if content.startswith("<div"):
+        if content.startswith(("<div", "<details")):
             chart_html += content + "\n"
         else:
             chart_html += (
