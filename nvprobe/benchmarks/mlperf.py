@@ -186,18 +186,39 @@ class MlperfBenchmark(BaseBenchmark):
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             stderr = getattr(exc, "stderr", "") or ""
-            # Extract only the meaningful error lines, skip verbose mlcr logs
+            stdout = getattr(exc, "stdout", "") or ""
+
+            # --- debugging: print the exact command and full stderr ---
+            print(f"    [DEBUG] Failed command: {' '.join(cmd)}")
+            print(f"    [DEBUG] Full stderr ({len(stderr)} chars):")
+            for line in stderr.splitlines():
+                print(f"      | {line}")
+
+            # --- real cuDNN error patterns (not just any mention of "cudnn") ---
+            _CUDNN_ERROR_PATTERNS = (
+                "libcudnn.so", "cudnn is not", "cudnn not found",
+                "cudnn.*not found", "cudnn_root is not set",
+                "cannot open shared object", "no module named.*cudnn",
+                "cudnn.*failed", "cudnn.*error",
+            )
+            stderr_lower = stderr.lower()
+            has_real_cudnn_error = any(
+                p in stderr_lower or p in stderr
+                for p in _CUDNN_ERROR_PATTERNS
+            )
+
+            # Extract meaningful error lines, skipping verbose mlcr logs
             error_lines = []
             for line in stderr.splitlines():
                 line_stripped = line.strip()
                 if any(kw in line_stripped.lower() for kw in (
-                    "error", "failed", "permission denied", "cudnn",
+                    "error", "failed", "permission denied",
                     "not found", "exception", "traceback",
                 )):
                     error_lines.append(line_stripped)
             detail = "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
 
-            if "cudnn" in detail.lower() or "cudnn" in stderr.lower():
+            if has_real_cudnn_error:
                 detail = (
                     "cuDNN not detected by MLPerf pipeline.\n"
                     "  mlcr's sub-scripts do not inherit parent environment\n"

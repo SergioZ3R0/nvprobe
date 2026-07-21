@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nvprobe"
-version = "0.5.51"
+version = "0.5.52"
 description = "NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison"
 readme = "README.md"
 license = "Apache-2.0"
