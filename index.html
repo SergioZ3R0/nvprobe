@@ -122,33 +122,31 @@
             background: #0a0a0a;
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 20px 24px;
+            padding: 20px 40px 20px 24px;
             font-family: 'SF Mono', 'Fira Code', monospace;
             font-size: 0.9rem;
             overflow-x: auto;
             margin: 16px 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
             max-width: 100%;
             min-width: 0;
             box-sizing: border-box;
+            position: relative;
         }
-        .code-block > * { min-width: 0; }
         .code-block .cmd { color: var(--neon); white-space: nowrap; }
         .code-block .copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
             background: none;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
-            padding: 6px;
-            flex-shrink: 0;
+            padding: 4px;
             line-height: 0;
             transition: border-color .2s;
         }
         .code-block .copy-btn:hover { border-color: var(--green); }
-        .code-block .copy-btn svg { width: 18px; height: 18px; display: block; }
+        .code-block .copy-btn svg { width: 10px; height: 10px; display: block; }
         .code-block .copy-btn .check { display: none; }
         .code-block .copy-btn.copied .clip { display: none; }
         .code-block .copy-btn.copied .check { display: block; }
