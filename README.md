@@ -1,118 +1,95 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/SergioZ3R0/nvprobe/main/nvprobe/nvprobe.svg" alt="nvProbe" width="180">
+</div>
+
+<h1 align="center">nvProbe</h1>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SergioZ3R0/nvprobe/main/nvprobe/nvprobe.svg" alt="nvProbe logo" width="200">
+  <b>NVIDIA GPU &amp; CUDA Benchmark Suite</b><br>
+  <i>Automate CUDA workloads &bull; HPL &amp; HPCG &bull; MLPerf inference &bull; Custom kernels &bull; Interactive reports</i>
 </p>
 
-# nvProbe: NVIDIA GPU & CUDA Benchmark Suite
+<p align="center">
+  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/v/nvprobe?style=flat&label=PyPI" alt="PyPI"></a>
+  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/pyversions/nvprobe?style=flat&label=" alt="Python"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat" alt="License"></a>
+  <img src="https://img.shields.io/badge/CUDA-12%20%7C%2013-76b900?style=flat&logo=nvidia" alt="CUDA">
+</p>
 
-NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison.
+```bash
+pip install nvprobe && nvprobe setup && nvprobe run --local
+```
 
-nvProbe runs standardized benchmarks across your GPU fleet, captures environment details, stores results in SQLite, and generates self-contained HTML reports — helping HPC engineers and ML teams make data-driven hardware purchasing decisions.
+---
 
 ## Features
 
-- **Benchmark modules**: Bandwidth, custom CUDA kernels (matmul, conv2d, attention), HPL, HPCG, MLPerf
+| | | |
+|---|---|---|
+| ⚡ **Bandwidth** | 🧮 **MatMul / Attention** | 🔧 **Conv2D** |
+| H2D / D2H / D2D across buffer sizes | fp32, fp16, int8 custom CUDA kernels | 2D convolution benchmarks |
+| 🏎️ **HPL** (FP64 Linpack) | 🌀 **HPCG** | 🧠 **MLPerf Inference** |
+| Datacenter GPUs: A100, H100, B200, L40S… | Conjugate Gradients | ONNX Runtime via cmx4mlperf |
 
-## Known Limitations
-
-- **HPL / HPCG on workstation GPUs**: the NVIDIA HPC Benchmarks binaries (xhpl/xhpcg) used by
-  nvprobe are validated by NVIDIA against datacenter GPUs (A100, H100, etc.). On professional
-  workstation GPUs (e.g. the RTX Axxx series), these binaries may crash with a segmentation
-  fault during GPU initialization. This is a limitation of NVIDIA's precompiled binaries, not
-  of nvprobe, and cannot be fixed from this project. Bandwidth and custom kernel benchmarks
-  are unaffected and work correctly on any CUDA-capable GPU.
-
-- **MLPerf cuDNN detection**: the MLPerf pipeline (cmx4mlperf / mlcr) discovers cuDNN by
-  searching system CUDA toolkit paths. If cuDNN is installed via `pip install nvidia-cudnn-cuXX`,
-  you may need to pre-register it with mlcr first:
-
-      mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')
-
-- **Slurm integration**: Generate and submit sbatch scripts, run across multiple nodes/GPUs
-- **Environment fingerprinting**: Driver version, CUDA version, GPU model, memory, PCI bus ID — captured automatically
-- **SQLite storage**: All results persisted with full query capability
-- **CSV/JSON export**: Raw data for programmatic access
-- **HTML reports**: Self-contained reports with matplotlib charts, sidebar navigation, and comparison views
-- **YAML configs**: Define test matrices (GPU models, precisions, batch sizes) declaratively
-- **Reproducible**: Same config + same hardware = same results
+- **Bundled CUDA runtime** &mdash; CuPy `[ctk]` via pip, no system toolkit required
+- **Auto-downloaded HPC tools** &mdash; NVIDIA HPC Benchmarks cached in `~/.nvprobe/tools/`
+- **Interactive HTML reports** &mdash; Plotly charts with GPU / transfer / precision dropdowns
+- **A/B comparison** &mdash; compare two result sets side-by-side
+- **Slurm integration** &mdash; generate, submit, monitor, collect from HPC clusters
+- **SQLite storage** &mdash; all results persisted; CSV / JSON export
 
 ## Quick Start
 
+| Step | Command | What it does |
+|------|---------|-------------|
+| 1 | `pip install nvprobe` | Install the package |
+| 2 | `nvprobe setup` | Install CuPy, download HPL/HPCG, generate configs |
+| 3 | `nvprobe env` | Verify GPU detection, driver, CUDA version |
+| 4 | `nvprobe run --local` | Run all benchmarks locally |
+| 5 | `nvprobe report --open` | Generate &amp; open interactive HTML report |
+
+Or from source:
 ```bash
-pip install nvprobe
-nvprobe setup                      # install cupy + HPL/HPCG + generate configs
-nvprobe run --config nvprobe/configs/local.yaml --local
+git clone https://github.com/SergioZ3R0/nvprobe.git && cd nvprobe
+pip install -e . && nvprobe setup && nvprobe run --local
 ```
 
-### Or install from source
+### More commands
 
-```bash
-git clone https://github.com/SergioZ3R0/nvprobe.git
-cd nvprobe
-pip install -e .
-nvprobe setup                      # installs nvprobe + self-contained CuPy
-nvprobe run --config nvprobe/configs/local.yaml --local
-```
+| Command | Description |
+|---------|-------------|
+| `nvprobe compare --a results/run1 --b results/run2` | Compare two runs |
+| `nvprobe run --config configs/cluster.yaml` | Run with custom YAML config |
+| `nvprobe slurm submit --config configs/cluster.yaml` | Submit Slurm job |
+| `nvprobe slurm status` | Check Slurm job status |
+| `nvprobe setup --cuda 13` | Setup with specific CUDA version |
 
-### Detect GPU environment
+## Charts
 
-```bash
-nvprobe env
-```
+Plotly charts with interactive controls:
 
-### Run benchmarks (dry run)
+- **Bandwidth** &mdash; filter by GPU and transfer type (H2D / D2H / D2D)
+- **MatMul / Attention** &mdash; filter by GPU and precision (fp32 / fp16)
+- **Range slider** &mdash; zoom into any x-axis region
+- **Moving average** &mdash; smoother trend lines for dense data
 
-```bash
-nvprobe run --config configs/default.yaml --dry-run
-```
-
-### Run benchmarks
-
-```bash
-nvprobe run --config configs/default.yaml
-```
-
-### Generate report
-
-```bash
-nvprobe report
-```
-
-### Compare two runs
-
-```bash
-nvprobe compare --a results/run1 --b results/run2
-```
-
-## Configuration
-
-Edit `configs/default.yaml` to define your test matrix:
+## YAML Config
 
 ```yaml
-name: my-benchmark-run
-description: "Comparing L40S vs B200"
-
+name: my-run
 gpu:
   models: ["L40S", "B200"]
-
 slurm:
   enabled: true
   partition: gpu
   gpus_per_node: 8
-
-precisions:
-  - fp32
-  - fp16
-  - int8
-
+precisions: [fp32, fp16]
 benchmarks:
   - name: bandwidth
-    enabled: true
     params:
       sizes_mb: [1, 4, 16, 64, 256, 1024]
   - name: custom
-    enabled: true
     params:
-      kernels: [matmul, conv2d, attention]
+      kernels: [matmul, attention]
 ```
 
 ## Project Structure
@@ -120,83 +97,37 @@ benchmarks:
 ```
 nvprobe/
 ├── nvprobe/
-│   ├── cli.py              # CLI entry point
-│   ├── config.py           # YAML config loader
-│   ├── runner.py           # Benchmark orchestration
-│   ├── slurm.py            # Slurm job management
-│   ├── reporter.py         # HTML report generator with charts
-│   ├── db.py               # SQLite storage + CSV/JSON export
+│   ├── cli.py                     # CLI entry point
+│   ├── config.py                  # YAML config loader
+│   ├── runner.py                  # Benchmark orchestration
+│   ├── slurm.py                   # Slurm job management
+│   ├── reporter.py                # Plotly HTML report generator
+│   ├── db.py                      # SQLite storage + CSV/JSON export
 │   └── benchmarks/
-│       ├── base.py         # Base benchmark class
-│       ├── bandwidth.py    # Memory bandwidth tests
-│       ├── custom.py       # Custom CUDA kernels
-│       ├── hpl.py          # HPL wrapper
-│       ├── hpcg.py         # HPCG wrapper
-│       ├── mlperf.py       # MLPerf wrapper
-│       └── _cuda/
-│           ├── bandwidth_test.py   # CUDA bandwidth implementation
-│           ├── custom_kernels.py   # matmul/conv2d/attention
-│           └── utils.py            # Shared GPU utilities
+│       ├── base.py                # Base class, GPU detection, diagnostics
+│       ├── bandwidth.py           # Memory bandwidth tests
+│       ├── custom.py              # Custom CUDA kernels
+│       ├── hpl.py                 # HPL wrapper
+│       ├── hpcg.py                # HPCG wrapper
+│       ├── mlperf.py              # MLPerf via cmx4mlperf
+│       └── _cuda/                 # Raw CUDA kernels
 ├── configs/
-│   └── default.yaml        # Default test configuration
-├── reports/                 # Generated HTML reports
-├── results/                 # Benchmark results (SQLite + JSON)
+│   ├── default.yaml
+│   └── local.yaml
+├── nvprobe.svg
+├── index.html
 ├── README.md
 └── pyproject.toml
 ```
 
-## Roadmap
+## Notes
 
-### v0.1.0 — Project base ✓
-- CLI with Typer (run, report, compare, env, version)
-- YAML config system for test matrices
-- Benchmark module framework (base class + stubs)
-- Runner with nvidia-smi environment detection
-- SQLite storage for results
-- HTML report generator (basic)
-- Default config for L40S/B200 GPUs
-
-### v0.2.0 — CUDA benchmarks ✓
-- Bandwidth test (host↔device, device↔device) via cupy
-- Custom CUDA kernels: matmul, conv2d, attention
-- HPL/HPCG binary wrappers with Slurm script generation
-- MLPerf inference/training wrapper
-- Optional cupy dependency (`pip install nvprobe[cuda]`)
-
-### v0.3.0 — Slurm integration ✓
-- sbatch script generation
-- Job submission and monitoring
-- Multi-GPU parallel execution
-- Result collection from Slurm output
-
-### v0.4.0 — Reporting ✓
-- Matplotlib charts (bandwidth, matmul, attention, GPU comparison)
-- Corporate branding (sidebar, color palette, env cards)
-- Comparison reports (A vs B)
-- CSV/JSON auto-export alongside HTML
-
-### v0.5.0 — Reproducibility ✓
-- Singularity container support (CUDA 12.4 runtime)
-- Makefile for common dev operations
-- Git-tracked configs and results
-- Singularity container support
-- Environment fingerprinting
-- Git-tracked configs and results
+- **HPL / HPCG** &mdash; NVIDIA HPC Benchmarks binaries are validated for datacenter GPUs (A100, H100, B200, L40S…). They may crash (SIGSEGV) on RTX series. Bandwidth and custom kernels work on any CUDA GPU.
+- **MLPerf cuDNN** &mdash; `mlcr` discovers cuDNN via system CUDA paths. If installed via `pip install nvidia-cudnn-cuXX`, pre-register with: `mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0]'))`
 
 ## Requirements
 
-- Python 3.10+
-- NVIDIA GPU with CUDA drivers installed
-- Slurm (for multi-node execution)
-- `nvidia-smi` available in PATH
-- Singularity (optional, for containerized execution)
-
-## Container
-
-```bash
-make container-build    # builds nvprobe.sif
-make container-run      # runs with --nv GPU passthrough
-```
+Python 3.10+ &bull; NVIDIA GPU with CUDA drivers &bull; `nvidia-smi` in PATH &bull; Slurm (optional)
 
 ## License
 

@@ -45,7 +45,7 @@
         header .logo-big svg { width: 120px; height: 120px; margin-bottom: 24px; }
         header h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.02em; }
         header h1 span { color: var(--green); }
-        header p { font-size: 1.25rem; color: var(--muted); max-width: 600px; margin: 16px auto 32px; }
+        header p { font-size: 1.25rem; color: var(--muted); max-width: 640px; margin: 16px auto 32px; }
         .btn {
             display: inline-block;
             padding: 12px 32px;
@@ -72,6 +72,7 @@
         .badge-py { background: #306998; color: #fff; }
         .badge-cuda { background: var(--green); color: #000; }
         .badge-hpc { background: var(--neon); color: #000; }
+        .badge-ml { background: #ff6b6b; color: #000; }
 
         section { padding: 80px 0; }
         section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 48px; text-align: center; }
@@ -167,6 +168,16 @@
         .benchmark-card .tag { font-size: 0.75rem; display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 10px; background: var(--border); color: var(--neon); }
         .benchmark-card .tag.tag-warning { color: var(--muted); }
 
+        .cmds { max-width: 600px; margin: 32px auto 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .cmd-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 12px 20px;
+            font-size: 0.85rem; font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+        .cmd-row .cmd { color: var(--neon); }
+        .cmd-row .desc { color: var(--muted); font-family: -apple-system, sans-serif; font-size: 0.8rem; }
+
         footer {
             border-top: 1px solid var(--border);
             padding: 40px 0;
@@ -214,14 +225,15 @@
             </div>
             <h1>nv<span>probe</span></h1>
             <p>
-                NVIDIA GPU benchmark suite — automate CUDA workloads,
-                run HPL &amp; HPCG, profile custom kernels, compare hardware,
-                and generate rich reports.
+                Automate CUDA workloads, run HPL &amp; HPCG, profile custom kernels,
+                benchmark MLPerf inference, compare hardware, and generate interactive
+                HTML reports — all from a single CLI.
             </p>
             <div style="margin-bottom: 20px;">
                 <span class="badge badge-py">Python 3.10+</span>
                 <span class="badge badge-cuda">CUDA 12 / 13</span>
-                <span class="badge badge-hpc">HPC</span>
+                <span class="badge badge-hpc">HPL / HPCG</span>
+                <span class="badge badge-ml">MLPerf</span>
             </div>
             <a href="https://pypi.org/project/nvprobe/" class="btn btn-primary">View on PyPI</a>
             <a href="https://github.com/SergioZ3R0/nvprobe" class="btn btn-outline">View on GitHub</a>
@@ -233,32 +245,32 @@
                 <div class="feature">
                     <div class="icon">📊</div>
                     <h3>Pre-built Benchmarks</h3>
-                    <p>Memory bandwidth, latency, matrix multiply, attention — run standard CUDA workloads with zero setup.</p>
+                    <p>Memory bandwidth, matmul, attention, convolution — run standard CUDA workloads with zero setup.</p>
                 </div>
                 <div class="feature">
                     <div class="icon">🏎️</div>
                     <h3>HPL &amp; HPCG</h3>
-                    <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks binaries — downloads and runs automatically.</p>
+                    <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks — auto-downloaded on setup.</p>
                 </div>
                 <div class="feature">
                     <div class="icon">🧠</div>
                     <h3>MLPerf Inference</h3>
-                    <p>Run MLPerf inference benchmarks with configurable mode, batch size, and precision.</p>
+                    <p>End-to-end MLPerf via cmx4mlperf with configurable model, framework, and precision.</p>
                 </div>
                 <div class="feature">
                     <div class="icon">📈</div>
-                    <h3>HTML Reports</h3>
-                    <p>Generate interactive HTML reports with charts comparing GPUs, precisions, and problem sizes.</p>
+                    <h3>Interactive Charts</h3>
+                    <p>Plotly charts with GPU, transfer type, and precision dropdowns — filter data without regenerating.</p>
                 </div>
                 <div class="feature">
                     <div class="icon">📦</div>
                     <h3>Bundled CUDA Runtime</h3>
-                    <p>No system CUDA toolkit required — use <code>cupy-cuda13x[ctk]</code> to bundle CUDA libs with pip.</p>
+                    <p>No system CUDA toolkit required — CuPy with <code>[ctk]</code> bundles everything via pip.</p>
                 </div>
                 <div class="feature">
                     <div class="icon">🖥️</div>
                     <h3>Slurm Integration</h3>
-                    <p>Submit, monitor, and collect results from HPC clusters — all from a single CLI.</p>
+                    <p>Generate, submit, monitor, and collect results from HPC clusters — all from a single CLI.</p>
                 </div>
             </div>
         </section>
@@ -280,9 +292,23 @@
                 </div>
                 <div class="step">
                     <div class="step-content">
-                        <h3>Initialize config</h3>
+                        <h3>Setup</h3>
+                        <p>Install CuPy, download HPL/HPCG binaries, generate configs</p>
                         <div class="code-block">
-                            <span class="cmd">nvprobe init</span>
+                            <span class="cmd">nvprobe setup</span>
+                            <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
+                                <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-content">
+                        <h3>Check environment</h3>
+                        <p>Verify GPU detection, driver, and CUDA version</p>
+                        <div class="code-block">
+                            <span class="cmd">nvprobe env</span>
                             <button class="copy-btn" onclick="copyCmd(this)" title="Copy">
                                 <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                 <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -315,6 +341,14 @@
                     </div>
                 </div>
             </div>
+
+            <h2 style="margin-top: 60px; font-size: 1.3rem;">More commands</h2>
+            <div class="cmds">
+                <div class="cmd-row"><span class="cmd">nvprobe compare --a results/run1 --b results/run2</span><span class="desc">Compare runs</span></div>
+                <div class="cmd-row"><span class="cmd">nvprobe run --config configs/cluster.yaml</span><span class="desc">Custom config</span></div>
+                <div class="cmd-row"><span class="cmd">nvprobe slurm submit --config configs/cluster.yaml</span><span class="desc">Slurm submit</span></div>
+                <div class="cmd-row"><span class="cmd">nvprobe setup --cuda 13</span><span class="desc">Specific CUDA</span></div>
+            </div>
         </section>
 
         <section>
@@ -322,13 +356,13 @@
             <div class="benchmarks">
                 <div class="benchmark-card">
                     <h3>Bandwidth</h3>
-                    <p>Memory read/write, copy, stride, pointer-chase latency</p>
-                    <span class="tag">CUDA C</span>
+                    <p>H2D, D2H, D2D memory bandwidth across buffer sizes</p>
+                    <span class="tag">CuPy</span>
                 </div>
                 <div class="benchmark-card">
                     <h3>Custom Kernels</h3>
-                    <p>MatMul, tiled MatMul, fused attention, reduction</p>
-                    <span class="tag">CuPy</span>
+                    <p>MatMul, tiled MatMul, fused attention, convolution</p>
+                    <span class="tag">CUDA C</span>
                 </div>
                 <div class="benchmark-card">
                     <h3>HPL</h3>
@@ -338,20 +372,20 @@
                 </div>
                 <div class="benchmark-card">
                     <h3>HPCG</h3>
-                    <p>High Performance Conjugate Gradients</p>
+                    <p>Conjugate Gradients</p>
                     <span class="tag">MPI</span>
                     <span class="tag tag-warning">Datacenter GPUs</span>
                 </div>
                 <div class="benchmark-card">
                     <h3>MLPerf</h3>
-                    <p>MLPerf Inference (test / find_performance / full)</p>
-                    <span class="tag">TFLite</span>
+                    <p>MLPerf Inference — test / find_performance / full</p>
+                    <span class="tag">ONNX Runtime</span>
                 </div>
             </div>
         </section>
 
         <footer>
-            <p>Apache 2.0 &middot; Built with ❤️ by <a href="https://github.com/SergioZ3R0">SergioZ3R0</a></p>
+            <p>Apache 2.0 &middot; Built by <a href="https://github.com/SergioZ3R0">SergioZ3R0</a></p>
         </footer>
     </div>
 
