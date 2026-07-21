@@ -1,0 +1,69 @@
+name: Bug Report
+description: File a bug report so we can improve nvprobe.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report for `nvprobe`! 
+        Please fill out all the required fields below so we can replicate the issue.
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: What commands did you run? (e.g., `nvprobe run --local`, `nvprobe slurm submit`)
+      placeholder: |
+        1. Ran command: ...
+        2. With config file: ...
+        3. Error occurred...
+    validations:
+      required: true
+  - type: input
+    id: gpu_model
+    attributes:
+      label: GPU Model(s)
+      description: What hardware are you testing on?
+      placeholder: e.g., 4x NVIDIA B200, 8x H100, RTX 4090
+    validations:
+      required: true
+  - type: input
+    id: cuda_version
+    attributes:
+      label: CUDA Version
+      description: Check with `nvprobe env` or `nvcc --version`.
+      placeholder: e.g., 12.1
+    validations:
+      required: true
+  - type: input
+    id: python_version
+    attributes:
+      label: Python Version
+      placeholder: e.g., 3.10
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Execution Environment
+      options:
+        - Local Machine / Single Node
+        - Slurm HPC Cluster
+        - Docker / Singularity Container
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs / Output
+      description: Paste the terminal output, traceback, or MLPerf logs.
+      render: shell
+    validations:
+      required: false
