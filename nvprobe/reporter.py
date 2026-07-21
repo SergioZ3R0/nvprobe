@@ -75,7 +75,11 @@ def _extract_val(v: Any, key: str = "mean") -> float:
 
 
 def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
-    """Generate bandwidth comparison chart."""
+    """Generate interactive bandwidth chart with Plotly (GPU + transfer type dropdowns)."""
+    import json as _json
+    import plotly.graph_objects as go
+    import plotly.utils
+
     grouped: dict[str, dict] = {}
     for r in results:
         metrics = _parse_metrics(r.get("metrics", "{}"))
@@ -86,30 +90,95 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
     if not grouped:
         return ""
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    width = 0.25
     gpu_names = list(grouped.keys())
+    sizes = list(list(grouped.values())[0].get("h2d", {}).keys())
+
+    H2D_COLORS = ['#08306b', '#08519c', '#2171b5', '#4292c6', '#6baed6', '#9ecae1',
+                  '#c6dbef', '#08306b', '#08519c', '#2171b5', '#4292c6', '#6baed6']
+    D2H_COLORS = ['#00441b', '#006d2c', '#238b45', '#41ab5d', '#74c476', '#a1d99b',
+                  '#c7e9c0', '#00441b', '#006d2c', '#238b45', '#41ab5d', '#74c476']
+    D2D_COLORS = ['#7f2704', '#a63603', '#d94801', '#e6550d', '#fd8d3c', '#fdbe85',
+                  '#fdd0a2', '#7f2704', '#a63603', '#d94801', '#e6550d', '#fd8d3c']
+
+    fig = go.Figure()
+    trace_info: list[list[int | str]] = []
 
     for i, (gpu, data) in enumerate(grouped.items()):
-        sizes = list(data.get("h2d", {}).keys())
-        h2d_vals = [_extract_val(v, "mean") for v in data.get("h2d", {}).values()]
-        d2h_vals = [_extract_val(v, "mean") for v in data.get("d2h", {}).values()]
-        d2d_vals = [_extract_val(v, "mean") for v in data.get("d2d", {}).values()]
+        for ttype, cname, palette in [
+            ("h2d", "H2D", H2D_COLORS),
+            ("d2h", "D2H", D2H_COLORS),
+            ("d2d", "D2D", D2D_COLORS),
+        ]:
+            vals = [_extract_val(v, "mean") for v in data.get(ttype, {}).values()]
+            if not vals:
+                continue
+            fig.add_trace(go.Bar(
+                x=list(sizes),
+                y=vals,
+                name=f"{gpu} {cname}",
+                legendgroup=cname,
+                marker_color=palette[i % len(palette)],
+                hovertemplate="%{x} MB<br>%{y:.1f} GB/s<extra>" + cname + " — " + gpu + "</extra>",
+            ))
+            trace_info.append([i, ttype])
 
-        x = [j + i * width for j in range(len(sizes))]
-        ax.bar([xi - width for xi in x], h2d_vals, width, label=f"{gpu} H2D", color=SERIES_COLORS[i * 3 % len(SERIES_COLORS)])
-        ax.bar(x, d2h_vals, width, label=f"{gpu} D2H", color=SERIES_COLORS[(i * 3 + 1) % len(SERIES_COLORS)])
-        ax.bar([xi + width for xi in x], d2d_vals, width, label=f"{gpu} D2D", color=SERIES_COLORS[(i * 3 + 2) % len(SERIES_COLORS)])
+    n_gpus = len(gpu_names)
+    n_traces = len(trace_info)
 
-    ax.set_xlabel("Buffer Size (MB)")
-    ax.set_ylabel("Bandwidth (GB/s)")
-    ax.set_title("Memory Bandwidth by Buffer Size")
-    ax.set_xticks([i + width * (len(gpu_names) - 1) / 2 for i in range(len(sizes))])
-    ax.set_xticklabels(sizes)
-    _set_legend(ax, len(gpu_names) * 3)
-    ax.grid(axis="y", alpha=0.3)
+    fig.update_layout(
+        barmode="group",
+        title=dict(text="Memory Bandwidth by Buffer Size", x=0.5),
+        xaxis_title="Buffer Size (MB)",
+        yaxis_title="Bandwidth (GB/s)",
+        hovermode="x unified",
+        legend=dict(font=dict(size=10)),
+        template="none",
+        margin=dict(l=60, r=20, t=60, b=60),
+        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"),
+    )
 
-    return _fig_to_base64(fig)
+    fig_json = _json.dumps(fig.to_plotly_json(), cls=plotly.utils.PlotlyJSONEncoder)
+    trace_info_json = _json.dumps(trace_info)
+
+    options_gpu = '<option value="-1">All GPUs</option>'
+    options_gpu += "".join(f'<option value="{i}">GPU {i}</option>' for i in range(n_gpus))
+    return f"""<div class="chart" style="padding:0;">
+<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);cursor:pointer;user-select:none;"
+  onclick="var d=this.parentElement;d.open=!d.open;if(d.open){{var el=document.getElementById('bw-chart');if(el&&el.layout)Plotly.Plots.resize(el);}}">
+  Memory Bandwidth
+</summary>
+<div style="padding:0.75rem 1rem 0;">
+  <label style="font-weight:600;font-size:0.85rem;margin-right:1rem;">
+    GPU:
+    <select id="bw-gpu" onchange="updateBW()" style="margin-left:0.3rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;">
+      {options_gpu}
+    </select>
+  </label>
+  <label style="font-weight:600;font-size:0.85rem;">
+    Transfer:
+    <select id="bw-transfer" onchange="updateBW()" style="margin-left:0.3rem;padding:0.2rem 0.4rem;border:1px solid var(--border);border-radius:4px;">
+      <option value="all">All</option>
+      <option value="h2d">H2D</option>
+      <option value="d2h">D2H</option>
+      <option value="d2d">D2D</option>
+    </select>
+  </label>
+</div>
+<div id="bw-chart" style="padding:0 0.5rem 0.5rem;"></div>
+<script>
+var bwData = {fig_json};
+var bwMeta = {trace_info_json};
+Plotly.newPlot('bw-chart', bwData.data, bwData.layout, {{responsive: true, displayModeBar: false}});
+function updateBW() {{
+  var gpu = parseInt(document.getElementById('bw-gpu').value);
+  var transfer = document.getElementById('bw-transfer').value;
+  var vis = bwMeta.map(function(m) {{
+    return (gpu === -1 || m[0] === gpu) && (transfer === 'all' || m[1] === transfer);
+  }});
+  Plotly.restyle('bw-chart', 'visible', vis);
+}}
+</script>
+</div>"""
 
 
 def _chart_matmul(results: list[dict[str, Any]]) -> str:
@@ -456,11 +525,16 @@ def _render_html(
         ("hpcg", "HPCG — Conjugate Gradients"),
     ]
     for key, label in _CHART_NAMES:
-        if charts.get(key):
+        content = charts.get(key)
+        if not content:
+            continue
+        if content.startswith("<div"):
+            chart_html += content + "\n"
+        else:
             chart_html += (
                 f'<details class="chart">'
                 f'<summary>{label}</summary>'
-                f'<img src="{charts[key]}" alt="{label}">'
+                f'<img src="{content}" alt="{label}">'
                 f'</details>\n'
             )
 
@@ -472,6 +546,7 @@ def _render_html(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
 :root {{
     --accent: {COLORS['accent']};
