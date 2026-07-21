@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/badge/PyPI-3775A9?style=flat&logo=pypi&logoColor=white" alt="PyPI"></a>
-  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/pyversions/nvprobe?style=flat&label=" alt="Python"></a>
+  <a href="https://pypi.org/project/nvprobe/"><img src="https://img.shields.io/pypi/pyversions/nvprobe?style=flat&label=Python" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat" alt="License"></a>
   <img src="https://img.shields.io/badge/CUDA-12%20%7C%2013-76b900?style=flat&logo=nvidia" alt="CUDA">
 </p>
@@ -25,9 +25,9 @@ pip install nvprobe && nvprobe setup && nvprobe run --local
 
 | | | |
 |---|---|---|
-| ⚡ **Bandwidth** | 🧮 **MatMul / Attention** | 🔧 **Conv2D** |
+| **Bandwidth** | **MatMul / Attention** | **Conv2D** |
 | H2D / D2H / D2D across buffer sizes | fp32, fp16, int8 custom CUDA kernels | 2D convolution benchmarks |
-| 🏎️ **HPL** (FP64 Linpack) | 🌀 **HPCG** | 🧠 **MLPerf Inference** |
+| **HPL** (FP64 Linpack) | **HPCG** | **MLPerf Inference** |
 | Datacenter GPUs: A100, H100, B200, L40S… | Conjugate Gradients | ONNX Runtime via cmx4mlperf |
 
 - **Bundled CUDA runtime** &mdash; CuPy `[ctk]` via pip, no system toolkit required
