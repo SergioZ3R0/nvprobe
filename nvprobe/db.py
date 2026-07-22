@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -202,21 +203,26 @@ def fingerprint_environment() -> dict[str, Any]:
     smi = _run_cmd_safe(["nvidia-smi"])
     info["nvidia_smi_full"] = smi
 
+    # Parse CUDA version from nvidia-smi banner (handles both old "CUDA Version: X.Y"
+    # and new "CUDA UMD Version: X.Y" formats from driver 610+)
+    m = re.search(r'CUDA (?:UMD )?Version:\s*([\d.]+)', smi)
+    if m:
+        info["cuda_version"] = m.group(1)
+
     # Try combined query first (fast path)
     all_rows = _nvidia_smi_query(
-        "driver_version", "cuda_version", "name", "index", "memory.total", "pci.bus_id",
+        "driver_version", "name", "index", "memory.total", "pci.bus_id",
     )
     if all_rows:
         for row in all_rows:
             parts = row.split(",")
-            if len(parts) >= 6:
+            if len(parts) >= 5:
                 info["driver_version"] = parts[0].strip()
-                info["cuda_version"] = parts[1].strip()
                 info["gpus"].append({
-                    "model": parts[2].strip(),
-                    "index": int(parts[3].strip()),
-                    "memory_total_mb": _parse_mib(parts[4].strip()),
-                    "pci_bus_id": parts[5].strip(),
+                    "model": parts[1].strip(),
+                    "index": int(parts[2].strip()),
+                    "memory_total_mb": _parse_mib(parts[3].strip()),
+                    "pci_bus_id": parts[4].strip(),
                 })
 
     # Fallback: per-GPU queries (handles commas in GPU names gracefully)
@@ -258,6 +264,8 @@ def fingerprint_environment() -> dict[str, Any]:
                 })
                 if not info["driver_version"]:
                     info["driver_version"] = f"via cupy (CUDA {cp.cuda.runtime.runtimeGetVersion()})"
+                if not info["cuda_version"]:
+                    info["cuda_version"] = str(cp.cuda.runtime.runtimeGetVersion())
         except Exception:
             pass
 
