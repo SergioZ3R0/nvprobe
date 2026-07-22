@@ -338,6 +338,7 @@ def _chart_line_with_filters(
         trace_meta.append([gpu_idx, prec])
 
     chart_id = f"ch-{benchmark_key}"
+    fn_id = benchmark_key
     datasets_json = json.dumps(datasets)
     sizes_json = json.dumps(all_sizes)
     xlabel_js = json.dumps(xlabel)
@@ -391,8 +392,8 @@ def _chart_line_with_filters(
   }}
 
   renderLine(-1, 'all');
-  window['filterGpu_{chart_id}'] = function(idx) {{ renderLine(parseInt(idx), document.getElementById('{chart_id}-prec').value); }};
-  window['filterPrec_{chart_id}'] = function(p) {{ renderLine(parseInt(document.getElementById('{chart_id}-gpu').value), p); }};
+  window['filterGpu_{fn_id}'] = function(idx) {{ renderLine(parseInt(idx), document.getElementById('{chart_id}-prec').value); }};
+  window['filterPrec_{fn_id}'] = function(p) {{ renderLine(parseInt(document.getElementById('{chart_id}-gpu').value), p); }};
 }})();
 </script>"""
 
@@ -406,11 +407,11 @@ def _chart_line_with_filters(
     return f"""<details class="chart" open>
 <summary>{title}</summary>
 <div class="chart-toolbar">
-  <label>GPU: <select id="{chart_id}-gpu" onchange="filterGpu_{chart_id}(this.value)">
+  <label>GPU: <select id="{chart_id}-gpu" onchange="filterGpu_{fn_id}(this.value)">
     <option value="-1">All GPUs</option>
     {gpu_opts}
   </select></label>
-  <label>Precision: <select id="{chart_id}-prec" onchange="filterPrec_{chart_id}(this.value)">
+  <label>Precision: <select id="{chart_id}-prec" onchange="filterPrec_{fn_id}(this.value)">
     <option value="all">All</option>
     {prec_opts}
   </select></label>
@@ -905,6 +906,19 @@ def _render_html(
     --radius: {RADIUS};
     --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --sidebar-bg: {SIDEBAR_BG};
+    --sidebar-text: rgba(255,255,255,0.85);
+    --sidebar-muted: rgba(255,255,255,0.4);
+    --sidebar-border: rgba(255,255,255,0.08);
+    --sidebar-hover: rgba(255,255,255,0.05);
+    --sidebar-active: rgba(57,255,136,0.1);
+}}
+[data-theme="light"] {{
+    --bg: #F8F9FA;
+    --surface: #FFFFFF;
+    --text: #1A1D21;
+    --muted: #6B7280;
+    --border: rgba(0,0,0,0.08);
 }}
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 [id] {{ scroll-margin-top: 1.5rem; }}
@@ -916,27 +930,34 @@ body {{
 }}
 .sidebar {{
     position: fixed; top: 0; left: 0; bottom: 0;
-    width: var(--sidebar-width); background: {SIDEBAR_BG};
+    width: var(--sidebar-width); background: var(--sidebar-bg);
     display: flex; flex-direction: column; overflow: hidden; z-index: 200;
-    border-right: 1px solid var(--border);
+    border-right: 1px solid var(--sidebar-border);
 }}
 .sidebar-header {{
-    padding: 1.2rem 1rem; border-bottom: 1px solid var(--border); text-align: center;
+    padding: 1.2rem 1rem; border-bottom: 1px solid var(--sidebar-border); text-align: center;
 }}
 .sidebar-header svg,
 .sidebar-header img {{ width: 72px; height: 72px; margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto; }}
 .sidebar-title {{ font-size: 0.95rem; font-weight: 700; color: var(--accent); font-family: var(--font-mono); letter-spacing: 0.02em; }}
-.sidebar-subtitle {{ font-size: 0.65rem; color: var(--muted); margin-top: 0.15rem; font-family: var(--font-mono); }}
+.sidebar-subtitle {{ font-size: 0.65rem; color: var(--sidebar-muted); margin-top: 0.15rem; font-family: var(--font-mono); }}
 .sidebar-section {{ padding: 0.8rem 1rem 0.3rem; font-size: 0.65rem; font-weight: 700;
-    color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }}
+    color: var(--sidebar-muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }}
 .sidebar-link {{
-    display: block; padding: 0.45rem 1rem; color: var(--muted);
+    display: block; padding: 0.45rem 1rem; color: var(--sidebar-text);
     text-decoration: none; font-size: 0.82rem; font-family: var(--font-mono);
     border-left: 3px solid transparent;
     transition: background 0.12s, color 0.12s;
 }}
-.sidebar-link:hover {{ background: rgba(255,255,255,0.05); color: var(--text); }}
-.sidebar-link.active {{ background: rgba(57,255,136,0.1); color: var(--accent); border-left-color: var(--accent); }}
+.sidebar-link:hover {{ background: var(--sidebar-hover); color: var(--sidebar-text); }}
+.sidebar-link.active {{ background: var(--sidebar-active); color: var(--accent); border-left-color: var(--accent); }}
+.theme-btn {{
+    background: none; border: none; color: var(--sidebar-muted); cursor: pointer;
+    font-size: 1.1rem; padding: 0.6rem 1rem; text-align: left; width: 100%;
+    font-family: var(--font-mono); transition: color .2s;
+    border-top: 1px solid var(--sidebar-border);
+}}
+.theme-btn:hover {{ color: var(--sidebar-text); }}
 .main-content {{ margin-left: var(--sidebar-width); min-height: 100vh; padding: 2rem 2.5rem 4rem; }}
 h1 {{ font-size: 1.6rem; margin-bottom: 0.2rem; font-family: var(--font-mono); font-weight: 700; }}
 h2 {{ font-size: 1.2rem; margin: 2rem 0 0.8rem; color: var(--accent); font-family: var(--font-mono);
@@ -1010,6 +1031,8 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
     <a class="sidebar-link" href="#environment">Environment</a>
     <a class="sidebar-link" href="#charts">Charts</a>
     <a class="sidebar-link" href="#results">Results</a>
+    <div style="flex:1"></div>
+    <button id="theme-toggle" class="theme-btn" title="Toggle light/dark mode">&#9790;</button>
 </nav>
 <div class="main-content">
     <h1>{title}</h1>
@@ -1035,8 +1058,25 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
     <h2 id="results">Detailed Results</h2>
     {bench_tables}
 
-    <footer>Generated by nvProbe v{__version__} | {(run.get('created_at') or '')[:19]}</footer>
+    <footer>Generated by nvprobe</footer>
 </div>
+<script>
+(function() {{
+  var toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+  var html = document.documentElement;
+  function setTheme(t) {{
+    html.setAttribute('data-theme', t);
+    localStorage.setItem('nvprobe-theme', t);
+  }}
+  var saved = localStorage.getItem('nvprobe-theme');
+  if (saved) setTheme(saved);
+  toggle.addEventListener('click', function() {{
+    var cur = html.getAttribute('data-theme') || 'dark';
+    setTheme(cur === 'dark' ? 'light' : 'dark');
+  }});
+}})();
+</script>
 </body>
 </html>"""
 
@@ -1219,6 +1259,13 @@ def _render_comparison_html(
     --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }}
+[data-theme="light"] {{
+    --bg: #F8F9FA;
+    --surface: #FFFFFF;
+    --text: #1A1D21;
+    --muted: #6B7280;
+    --border: rgba(0,0,0,0.08);
+}}
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{
     font-family: var(--font-sans);
@@ -1247,6 +1294,12 @@ tr:hover td {{ background: rgba(57,255,136,0.04); }}
 .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }}
 .badge-ok {{ background: rgba(57,255,136,0.12); color: var(--accent); }}
 .badge-fail {{ background: rgba(255,92,92,0.12); color: var(--accent-fail); }}
+.theme-btn-compare {{
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0.5rem 1.2rem; cursor: pointer;
+    font-family: var(--font-mono); font-size: 0.82rem; transition: border-color .2s;
+}}
+.theme-btn-compare:hover {{ border-color: var(--accent); }}
 @media (max-width: 640px) {{
     body {{ padding: 1rem; }}
     .run-info {{ flex-direction: column; }}
@@ -1276,5 +1329,26 @@ tr:hover td {{ background: rgba(57,255,136,0.04); }}
 
 <h2>Results B — {run_b['name']}</h2>
 {_render_benchmark_tables(results_b)}
+
+<div style="text-align:center;margin-top:2rem">
+  <button id="theme-toggle" class="theme-btn-compare">Toggle dark/light mode</button>
+</div>
+<script>
+(function() {{
+  var toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+  var html = document.documentElement;
+  function setTheme(t) {{
+    html.setAttribute('data-theme', t);
+    localStorage.setItem('nvprobe-theme', t);
+  }}
+  var saved = localStorage.getItem('nvprobe-theme');
+  if (saved) setTheme(saved);
+  toggle.addEventListener('click', function() {{
+    var cur = html.getAttribute('data-theme') || 'dark';
+    setTheme(cur === 'dark' ? 'light' : 'dark');
+  }});
+}})();
+</script>
 </body>
 </html>"""

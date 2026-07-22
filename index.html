@@ -68,6 +68,13 @@
             --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
             --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
         }
+        [data-theme="light"] {
+            --bg: #F8F9FA;
+            --surface: #FFFFFF;
+            --text: #1A1D21;
+            --muted: #6B7280;
+            --border: rgba(0,0,0,0.08);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: var(--font-sans);
@@ -89,6 +96,8 @@
         nav .logo span { font-weight: 700; font-size: 1.3rem; color: var(--accent); font-family: var(--font-mono); }
         nav a:not(.logo) { color: var(--muted); text-decoration: none; margin-left: 24px; font-size: 0.9rem; transition: color .2s; font-family: var(--font-mono); font-size: 0.85rem; }
         nav a:not(.logo):hover { color: var(--text); }
+        .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px 10px; border-radius: 6px; margin-left: 12px; transition: border-color .2s; line-height: 1; }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
 
         header {
             padding: 80px 0 60px;
@@ -139,7 +148,7 @@
         section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 48px; text-align: center; font-family: var(--font-mono); color: var(--accent); }
 
         .hero-terminal {
-            background: #060809;
+            background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 20px 24px;
@@ -179,7 +188,7 @@
         .feature p { font-size: 0.9rem; color: var(--muted); }
 
         .code-block {
-            background: #060809;
+            background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 20px 40px 20px 24px;
@@ -347,6 +356,7 @@
             <div>
                 <a href="https://pypi.org/project/nvprobe/" aria-label="nvprobe on PyPI">PyPI</a>
                 <a href="https://github.com/SergioZ3R0/nvprobe" aria-label="nvprobe on GitHub">GitHub</a>
+                <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">&#9790;</button>
             </div>
         </nav>
 
@@ -637,6 +647,22 @@
 
             cursor.style.display = 'none';
             typeNext();
+        })();
+
+        (function() {
+            var toggle = document.getElementById('theme-toggle');
+            if (!toggle) return;
+            var html = document.documentElement;
+            function setTheme(t) {
+                html.setAttribute('data-theme', t);
+                localStorage.setItem('nvprobe-theme', t);
+            }
+            var saved = localStorage.getItem('nvprobe-theme');
+            if (saved) setTheme(saved);
+            toggle.addEventListener('click', function() {
+                var cur = html.getAttribute('data-theme') || 'dark';
+                setTheme(cur === 'dark' ? 'light' : 'dark');
+            });
         })();
     </script>
 </body>
