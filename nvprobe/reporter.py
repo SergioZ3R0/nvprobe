@@ -1,60 +1,36 @@
-"""HTML report generator — self-contained reports with matplotlib charts and corporate branding."""
+"""HTML report generator — self-contained reports with Chart.js interactive charts."""
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
 from nvprobe import __version__
 from nvprobe.db import Database
 
 
-# ── Color palette ──
-COLORS = {
-    "accent": "#0F6CBD",
-    "accent_dark": "#0C4FA3",
-    "accent_light": "#EBF3FC",
-    "bg": "#F3F2F1",
-    "surface": "#FFFFFF",
-    "sidebar_bg": "#201F1E",
-    "border": "#E0E0E0",
-    "text": "#242424",
-    "muted": "#707070",
-    "success": "#28a745",
-    "danger": "#dc3545",
-}
+# ── Design tokens (same as landing page) ──
+ACCENT = "#39FF88"
+ACCENT_WARN = "#FFB020"
+ACCENT_FAIL = "#FF5C5C"
+BG = "#0B0E10"
+SURFACE = "#14181B"
+TEXT = "#E8ECEF"
+MUTED = "#7C8791"
+BORDER = "rgba(255,255,255,0.08)"
+SIDEBAR_BG = "#0B0E10"
+RADIUS = "8px"
 
 SERIES_COLORS = [
-    "#A7C7E7", "#F4C28F", "#C9A7EB", "#B8E096", "#A8E6CF",
-    "#F7B7A3", "#D5C6E0", "#B8E0D2", "#F6C6EA", "#C7E8F3",
+    ACCENT,
+    "#5CB8FF",
+    ACCENT_WARN,
+    "#FF7CB8",
+    "#B87CFF",
+    "#7CFFF0",
 ]
-
-
-def _fig_to_base64(fig: plt.Figure) -> str:
-    """Convert matplotlib figure to base64 data URI."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
-    buf.seek(0)
-    return "data:image/png;base64," + base64.b64encode(buf.read()).decode("ascii")
-
-
-def _set_legend(ax, n_handles: int):
-    """Place legend outside the plot when there are many entries."""
-    kwargs = {"fontsize": 8}
-    if n_handles > 6:
-        kwargs["bbox_to_anchor"] = (1.05, 1)
-        kwargs["loc"] = "upper left"
-    ax.legend(**kwargs)
 
 
 def _parse_metrics(metrics_raw: str | dict) -> dict[str, Any]:
@@ -74,131 +50,6 @@ def _extract_val(v: Any, key: str = "mean") -> float:
     return float(v)
 
 
-def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
-    """Generate interactive bandwidth chart with Plotly updatemenus."""
-    import plotly.graph_objects as go
-    import plotly.offline
-
-    grouped: dict[str, dict] = {}
-    for r in results:
-        metrics = _parse_metrics(r.get("metrics", "{}"))
-        key = f"GPU {r['gpu_index']} ({r['gpu_model']})"
-        if "h2d" in metrics:
-            grouped[key] = metrics
-
-    if not grouped:
-        return ""
-
-    gpu_names = list(grouped.keys())
-    sizes = list(list(grouped.values())[0].get("h2d", {}).keys())
-
-    H2D_COLORS = ['#08306b', '#08519c', '#2171b5', '#4292c6', '#6baed6', '#9ecae1',
-                  '#c6dbef', '#08306b', '#08519c', '#2171b5', '#4292c6', '#6baed6']
-    D2H_COLORS = ['#00441b', '#006d2c', '#238b45', '#41ab5d', '#74c476', '#a1d99b',
-                  '#c7e9c0', '#00441b', '#006d2c', '#238b45', '#41ab5d', '#74c476']
-    D2D_COLORS = ['#7f2704', '#a63603', '#d94801', '#e6550d', '#fd8d3c', '#fdbe85',
-                  '#fdd0a2', '#7f2704', '#a63603', '#d94801', '#e6550d', '#fd8d3c']
-
-    fig = go.Figure()
-    trace_info: list[list[int | str]] = []
-
-    for i, (gpu, data) in enumerate(grouped.items()):
-        for ttype, cname, palette in [
-            ("h2d", "H2D", H2D_COLORS),
-            ("d2h", "D2H", D2H_COLORS),
-            ("d2d", "D2D", D2D_COLORS),
-        ]:
-            vals = [_extract_val(v, "mean") for v in data.get(ttype, {}).values()]
-            if not vals:
-                continue
-            fig.add_trace(go.Bar(
-                x=list(sizes),
-                y=vals,
-                name=f"{gpu} {cname}",
-                legendgroup=cname,
-                marker_color=palette[i % len(palette)],
-                visible=(ttype == "h2d"),
-                hovertemplate="%{x} MB<br>%{y:.1f} GB/s<extra>" + cname + " — " + gpu + "</extra>",
-            ))
-            trace_info.append([i, ttype])
-
-    n_gpus = len(gpu_names)
-    n_traces = len(trace_info)
-
-    def _vis_gpu(gpu_idx: int) -> list[bool]:
-        return [gi == gpu_idx for gi, _ in trace_info]
-
-    def _vis_transfer(ttype: str) -> list[bool]:
-        return [tt == ttype for _, tt in trace_info]
-
-    gpu_buttons = [dict(label="All GPUs", method="update", args=[{"visible": [True] * n_traces}])]
-    for i in range(n_gpus):
-        gpu_buttons.append(dict(label=f"GPU {i}", method="update", args=[{"visible": _vis_gpu(i)}]))
-
-    transfer_buttons = [dict(label="All", method="update", args=[{"visible": [True] * n_traces}])]
-    for ttype, label in [("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]:
-        transfer_buttons.append(dict(label=label, method="update", args=[{"visible": _vis_transfer(ttype)}]))
-
-    fig.update_layout(
-        barmode="group",
-        title=dict(text="Memory Bandwidth by Buffer Size", x=0.5),
-        xaxis_title="Buffer Size (MB)",
-        yaxis_title="Bandwidth (GB/s)",
-        hovermode="x unified",
-        legend=dict(font=dict(size=10)),
-        template="none",
-        margin=dict(l=60, r=20, t=100, b=60),
-        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"),
-        updatemenus=[
-            dict(
-                buttons=gpu_buttons,
-                direction="down",
-                showactive=True,
-                active=0,
-                x=0.02,
-                y=1.2,
-                xanchor="left",
-                yanchor="bottom",
-                bgcolor="#f0f0f0",
-                bordercolor="#ccc",
-                font=dict(size=12),
-            ),
-            dict(
-                buttons=transfer_buttons,
-                direction="down",
-                showactive=True,
-                active=1,
-                x=0.22,
-                y=1.2,
-                xanchor="left",
-                yanchor="bottom",
-                bgcolor="#f0f0f0",
-                bordercolor="#ccc",
-                font=dict(size=12),
-            ),
-        ],
-        annotations=[
-            dict(text="GPU", x=0.0, y=1.17, xref="paper", yref="paper",
-                 showarrow=False, font=dict(size=12)),
-            dict(text="Transfer", x=0.20, y=1.17, xref="paper", yref="paper",
-                 showarrow=False, font=dict(size=12)),
-        ],
-    )
-
-    plot_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type="div")
-
-    return f"""<details class="chart" open>
-<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);
-  cursor:pointer;user-select:none;"
-  ontoggle="if(this.parentElement.open){{var el=this.parentElement.querySelector('.js-plotly-plot');if(el)Plotly.Plots.resize(el);}}">
-  Memory Bandwidth
-</summary>
-<div style="min-height:500px;width:100%;padding:0.5rem;box-sizing:border-box;">
-{plot_div}
-</div>
-</details>"""
-
-
 def _moving_average(vals: list[float], window: int) -> list[float]:
     """Compute simple moving average (centered)."""
     if len(vals) < window or window < 2:
@@ -212,19 +63,243 @@ def _moving_average(vals: list[float], window: int) -> list[float]:
     return result
 
 
-def _plotly_line_chart(
+# ── Helper: render a Chart.js chart ──
+
+_CHART_COUNTER = 0
+
+
+def _chart_canvas(
+    chart_type: str,
+    data: dict,
+    options: dict,
+    title: str,
+    *,
+    open: bool = True,
+    aspect_ratio: float = 1.6,
+) -> str:
+    """Return a <details>/<canvas>/<script> block rendering the given Chart.js config."""
+    global _CHART_COUNTER
+    _CHART_COUNTER += 1
+    chart_id = f"c{_CHART_COUNTER}"
+
+    data_json = json.dumps(data)
+    options.setdefault("responsive", True)
+    options.setdefault("maintainAspectRatio", True)
+    options["aspectRatio"] = aspect_ratio
+    opts_json = json.dumps(options)
+
+    return f"""<details class="chart" {"open" if open else ""}>
+<summary>{title}</summary>
+<div class="chart-inner">
+  <canvas id="{chart_id}"></canvas>
+</div>
+</details>
+<script>
+(function(){{
+  var el = document.getElementById('{chart_id}');
+  if (!el || !window.Chart) return;
+  new Chart(el.getContext('2d'), {{
+    type: '{chart_type}',
+    data: {data_json},
+    options: {opts_json}
+  }});
+}})();
+</script>"""
+
+
+def _chart_default_opts(title_label: str = "") -> dict:
+    """Return default Chart.js options for the dark theme."""
+    return {
+        "responsive": True,
+        "maintainAspectRatio": True,
+        "aspectRatio": 1.6,
+        "plugins": {
+            "legend": {
+                "labels": {
+                    "color": MUTED,
+                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 11},
+                    "boxWidth": 14,
+                    "padding": 14,
+                }
+            },
+            "tooltip": {
+                "enabled": True,
+                "backgroundColor": SURFACE,
+                "titleFont": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 12},
+                "bodyFont": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 11},
+                "borderColor": BORDER,
+                "borderWidth": 1,
+                "padding": 10,
+                "cornerRadius": 6,
+                "titleColor": TEXT,
+                "bodyColor": TEXT,
+            },
+        },
+        "scales": {
+            "x": {
+                "grid": {"color": "rgba(255,255,255,0.04)"},
+                "ticks": {
+                    "color": MUTED,
+                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 10},
+                },
+            },
+            "y": {
+                "grid": {"color": "rgba(255,255,255,0.04)"},
+                "ticks": {
+                    "color": MUTED,
+                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 10},
+                },
+            },
+        },
+    }
+
+
+# ── Chart generators ──
+
+
+def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
+    """Bandwidth bar chart with GPU + transfer type dropdowns."""
+    grouped: dict[str, dict] = {}
+    for r in results:
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        key = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+        if "h2d" in metrics:
+            grouped[key] = metrics
+
+    if not grouped:
+        return ""
+
+    gpu_names = list(grouped.keys())
+    sizes = list(list(grouped.values())[0].get("h2d", {}).keys())
+    n_sizes = len(sizes)
+    if n_sizes == 0:
+        return ""
+
+    datasets = []
+    trace_info: list[list[int | str]] = []
+    for i, (gpu, data) in enumerate(grouped.items()):
+        for ti, (ttype, cname) in enumerate([("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]):
+            vals = [_extract_val(v, "mean") for v in data.get(ttype, {}).values()]
+            if not vals:
+                continue
+            color = SERIES_COLORS[i % len(SERIES_COLORS)]
+            datasets.append({
+                "label": f"{gpu} {cname}",
+                "data": vals,
+                "backgroundColor": color + "99",
+                "borderColor": color,
+                "borderWidth": 1,
+                "borderRadius": 2,
+                "hidden": ttype != "h2d",
+                "gpu_idx": i,
+                "ttype": ttype,
+            })
+            trace_info.append([i, ttype])
+
+    n_traces = len(trace_info)
+
+    def _vis_gpu(gpu_idx: int):
+        return [gi == gpu_idx for gi, _ in trace_info]
+
+    def _vis_transfer(ttype: str):
+        return [tt == ttype for _, tt in trace_info]
+
+    # Build HTML + JS with filter logic
+    chart_id = "ch-bw"
+    datasets_json = json.dumps(datasets)
+
+    filter_script = f"""
+<script>
+(function() {{
+  var chartInstance = null;
+  var bwData = {datasets_json};
+
+  function renderBandwidth(filterGpu, filterTransfer) {{
+    var ds = bwData.map(function(d, i) {{
+      var show = true;
+      if (filterGpu !== -1 && d.gpu_idx !== filterGpu) show = false;
+      if (filterTransfer && d.ttype !== filterTransfer) show = false;
+      return Object.assign({{}}, d, {{hidden: !show}});
+    }});
+    var ctx = document.getElementById('{chart_id}');
+    if (!ctx || !window.Chart) return;
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx.getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: {json.dumps(sizes)},
+        datasets: ds,
+      }},
+      options: Object.assign({{}}, {json.dumps(_chart_default_opts())}, {{
+        plugins: {{
+          legend: {{ labels: {{ color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}, boxWidth: 14, padding: 14 }} }},
+          tooltip: {{
+            enabled: true,
+            backgroundColor: '{SURFACE}',
+            titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+            bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+            borderColor: '{BORDER}',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 6,
+            titleColor: '{TEXT}',
+            bodyColor: '{TEXT}',
+            callbacks: {{
+              label: function(ctx) {{ return ctx.parsed.y.toFixed(1) + ' GB/s'; }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{ stacked: false, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+          y: {{ beginAtZero: true, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+        }},
+      }})
+    }});
+  }}
+
+  renderBandwidth(-1, 'h2d');
+  window.bwFilterGpu = function(idx) {{ renderBandwidth(idx, document.getElementById('bw-transfer').value); }};
+  window.bwFilterTransfer = function(ttype) {{ renderBandwidth(parseInt(document.getElementById('bw-gpu').value), ttype); }};
+}})();
+</script>"""
+
+    gpu_opts = "".join(
+        f'<option value="{i}">GPU {i}</option>' for i in range(len(gpu_names))
+    )
+    transfer_opts = "".join(
+        f'<option value="{t}" {"selected" if t == "h2d" else ""}>{l}</option>'
+        for t, l in [("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]
+    )
+
+    return f"""<details class="chart" open>
+<summary>Memory Bandwidth</summary>
+<div class="chart-toolbar">
+  <label>GPU: <select id="bw-gpu" onchange="bwFilterGpu(parseInt(this.value))">
+    <option value="-1">All GPUs</option>
+    {gpu_opts}
+  </select></label>
+  <label>Transfer: <select id="bw-transfer" onchange="bwFilterTransfer(this.value)">
+    {transfer_opts}
+  </select></label>
+</div>
+<div class="chart-inner">
+  <canvas id="{chart_id}"></canvas>
+</div>
+</details>
+{filter_script}"""
+
+
+def _chart_line_with_filters(
     results: list[dict[str, Any]],
     benchmark_key: str,
     title: str,
     xlabel: str,
     ylabel: str,
     value_key: str = "gflops",
+    unit: str = "GFLOPS",
 ) -> str:
-    """Interactive Plotly line chart with Precision + GPU dropdowns, smoothing, and range slider."""
-    import plotly.graph_objects as go
-    import plotly.offline
-
-    raw: list[tuple[int, str, dict]] = []  # (gpu_idx, precision, data_dict)
+    """Line chart with GPU + Precision dropdowns, smoothing, and glow."""
+    raw: list[tuple[int, str, dict]] = []
     for r in results:
         metrics = _parse_metrics(r.get("metrics", "{}"))
         data = metrics.get(benchmark_key, {})
@@ -238,102 +313,132 @@ def _plotly_line_chart(
     gpu_indices = sorted(set(gi for gi, _, _ in raw))
     precisions = sorted(set(p for _, p, _ in raw))
 
-    fig = go.Figure()
-    trace_meta: list[list[int | str]] = []  # [gpu_idx, precision]
-
+    datasets = []
+    trace_meta: list[list[int | str]] = []
     for i, (gpu_idx, prec, data) in enumerate(raw):
         sizes = sorted(int(k) for k in data.keys())
         vals = [data[str(s)].get(value_key, 0) for s in sizes]
         smooth = _moving_average(vals, max(3, len(vals) // 8))
         color = SERIES_COLORS[i % len(SERIES_COLORS)]
-        fig.add_trace(go.Scatter(
-            x=sizes,
-            y=smooth,
-            mode="lines+markers",
-            name=f"GPU {gpu_idx} ({prec})",
-            legendgroup=prec,
-            line=dict(width=2, color=color),
-            marker=dict(size=4, opacity=0.6, color=color),
-            hovertemplate=f"%{{x}}<br>%{{y:.1f}} {ylabel}<extra>GPU {gpu_idx} {prec}</extra>",
-        ))
+        datasets.append({
+            "label": f"GPU {gpu_idx} ({prec})",
+            "data": smooth,
+            "borderColor": color,
+            "backgroundColor": color + "0f",
+            "fill": True,
+            "tension": 0.3,
+            "pointRadius": 3,
+            "pointBackgroundColor": color,
+            "pointBorderColor": color,
+            "pointHoverRadius": 5,
+            "borderWidth": 2,
+            "gpu_idx": gpu_idx,
+            "precision": prec,
+        })
         trace_meta.append([gpu_idx, prec])
 
-    n_traces = len(trace_meta)
+    chart_id = f"ch-{benchmark_key}"
+    datasets_json = json.dumps(datasets)
+    sizes_json = json.dumps(all_sizes)
+    xlabel_js = json.dumps(xlabel)
+    ylabel_js = json.dumps(ylabel)
+    unit_js = json.dumps(unit)
 
-    def _vis_precision(p: str) -> list[bool]:
-        return [pm == p for _, pm in trace_meta]
+    filter_script = f"""
+<script>
+(function() {{
+  var chartInstance = null;
+  var lineData = {datasets_json};
 
-    def _vis_gpu(gi: int) -> list[bool]:
-        return [gpi == gi for gpi, _ in trace_meta]
+  function renderLine(filterGpu, filterPrec) {{
+    var ds = lineData.map(function(d) {{
+      var show = true;
+      if (filterGpu !== -1 && d.gpu_idx !== filterGpu) show = false;
+      if (filterPrec !== 'all' && d.precision !== filterPrec) show = false;
+      return Object.assign({{}}, d, {{hidden: !show}});
+    }});
+    var ctx = document.getElementById('{chart_id}');
+    if (!ctx || !window.Chart) return;
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx.getContext('2d'), {{
+      type: 'line',
+      data: {{ labels: {sizes_json}, datasets: ds }},
+      options: Object.assign({{}}, {json.dumps(_chart_default_opts())}, {{
+        plugins: {{
+          legend: {{ labels: {{ color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}, boxWidth: 14, padding: 14 }} }},
+          tooltip: {{
+            enabled: true,
+            backgroundColor: '{SURFACE}',
+            titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+            bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+            borderColor: '{BORDER}',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 6,
+            titleColor: '{TEXT}',
+            bodyColor: '{TEXT}',
+            callbacks: {{
+              label: function(ctx) {{ return ctx.parsed.y.toFixed(1) + ' {unit_js}'; }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{ title: {{ display: true, text: {xlabel_js}, color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}} }}, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+          y: {{ title: {{ display: true, text: {ylabel_js}, color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}} }}, beginAtZero: true, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+        }},
+      }})
+    }});
+  }}
 
-    gpu_buttons = [dict(label="All GPUs", method="update", args=[{"visible": [True] * n_traces}])]
-    for gi in gpu_indices:
-        gpu_buttons.append(dict(label=f"GPU {gi}", method="update", args=[{"visible": _vis_gpu(gi)}]))
+  renderLine(-1, 'all');
+  window['filterGpu_{chart_id}'] = function(idx) {{ renderLine(parseInt(idx), document.getElementById('{chart_id}-prec').value); }};
+  window['filterPrec_{chart_id}'] = function(p) {{ renderLine(parseInt(document.getElementById('{chart_id}-gpu').value), p); }};
+}})();
+</script>"""
 
-    prec_buttons = [dict(label="All", method="update", args=[{"visible": [True] * n_traces}])]
-    for p in precisions:
-        prec_buttons.append(dict(label=p, method="update", args=[{"visible": _vis_precision(p)}]))
-
-    fig.update_layout(
-        title=dict(text=title, x=0.5),
-        xaxis_title=xlabel,
-        yaxis_title=ylabel,
-        hovermode="x unified",
-        legend=dict(font=dict(size=10)),
-        template="none",
-        margin=dict(l=60, r=20, t=100, b=60),
-        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"),
-        xaxis=dict(rangeslider=dict(visible=True)),
-        updatemenus=[
-            dict(
-                buttons=gpu_buttons, direction="down", showactive=True, active=0,
-                x=0.02, y=1.2, xanchor="left", yanchor="bottom",
-                bgcolor="#f0f0f0", bordercolor="#ccc", font=dict(size=12),
-            ),
-            dict(
-                buttons=prec_buttons, direction="down", showactive=True, active=0,
-                x=0.22, y=1.2, xanchor="left", yanchor="bottom",
-                bgcolor="#f0f0f0", bordercolor="#ccc", font=dict(size=12),
-            ),
-        ],
-        annotations=[
-            dict(text="GPU", x=0.0, y=1.17, xref="paper", yref="paper",
-                 showarrow=False, font=dict(size=12)),
-            dict(text="Precision", x=0.20, y=1.17, xref="paper", yref="paper",
-                 showarrow=False, font=dict(size=12)),
-        ],
+    gpu_opts = "".join(
+        f'<option value="{gi}">GPU {gi}</option>' for gi in gpu_indices
+    )
+    prec_opts = "".join(
+        f'<option value="{p}" {"selected" if p == precisions[0] else ""}>{p}</option>' for p in precisions
     )
 
-    plot_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type="div")
     return f"""<details class="chart" open>
-<summary style="padding:0.6rem 1rem;font-weight:600;font-size:0.9rem;background:var(--surface);
-  cursor:pointer;user-select:none;"
-  ontoggle="if(this.parentElement.open){{var el=this.parentElement.querySelector('.js-plotly-plot');if(el)Plotly.Plots.resize(el);}}">
-  {title}
-</summary>
-<div style="min-height:400px;width:100%;padding:0.5rem;box-sizing:border-box;">
-{plot_div}
+<summary>{title}</summary>
+<div class="chart-toolbar">
+  <label>GPU: <select id="{chart_id}-gpu" onchange="filterGpu_{chart_id}(this.value)">
+    <option value="-1">All GPUs</option>
+    {gpu_opts}
+  </select></label>
+  <label>Precision: <select id="{chart_id}-prec" onchange="filterPrec_{chart_id}(this.value)">
+    <option value="all">All</option>
+    {prec_opts}
+  </select></label>
 </div>
-</details>"""
+<div class="chart-inner">
+  <canvas id="{chart_id}"></canvas>
+</div>
+</details>
+{filter_script}"""
 
 
 def _chart_matmul(results: list[dict[str, Any]]) -> str:
-    return _plotly_line_chart(results, "matmul", "Matrix Multiplication Performance",
-                              "Matrix Size (N×N)", "GFLOPS", "gflops")
+    return _chart_line_with_filters(results, "matmul", "Matrix Multiplication Performance",
+                                    "Matrix Size (N×N)", "GFLOPS", "gflops", "GFLOPS")
 
 
 def _chart_tiled_matmul(results: list[dict[str, Any]]) -> str:
-    return _plotly_line_chart(results, "tiled_matmul", "Tiled MatMul Performance (Shared Memory)",
-                              "Matrix Size (N×N)", "GFLOPS", "gflops")
+    return _chart_line_with_filters(results, "tiled_matmul", "Tiled MatMul (Shared Memory)",
+                                    "Matrix Size (N×N)", "GFLOPS", "gflops", "GFLOPS")
 
 
 def _chart_attention(results: list[dict[str, Any]]) -> str:
-    return _plotly_line_chart(results, "attention", "Scaled Dot-Product Attention Performance",
-                              "Sequence Length", "TFLOPS", "tflops")
+    return _chart_line_with_filters(results, "attention", "Scaled Dot-Product Attention",
+                                    "Sequence Length", "TFLOPS", "tflops", "TFLOPS")
 
 
 def _chart_hpl(results: list[dict[str, Any]]) -> str:
-    """Generate HPL GFLOPS bar chart per problem size."""
+    """HPL grouped bar chart per problem size."""
     data: list[tuple[str, int, float]] = []
     for r in results:
         if not r.get("success"):
@@ -350,34 +455,48 @@ def _chart_hpl(results: list[dict[str, Any]]) -> str:
     if not data:
         return ""
 
-    fig, ax = plt.subplots(figsize=(10, 5))
     labels = sorted(set(d[0] for d in data))
     by_label: dict[str, list[tuple[int, float]]] = {l: [] for l in labels}
     for label, size, gflops in data:
         by_label[label].append((size, gflops))
 
-    width = 0.8 / max(len(labels), 1)
+    all_sizes = sorted(set(d[1] for d in data))
+    datasets = []
     for i, label in enumerate(labels):
         pairs = sorted(by_label[label])
-        sizes = [p[0] for p in pairs]
-        vals = [p[1] for p in pairs]
-        x = [j + i * width for j in range(len(sizes))]
-        ax.bar(x, vals, width, label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)])
+        size_map = {s: v for s, v in pairs}
+        vals = [size_map.get(s, 0) for s in all_sizes]
+        color = SERIES_COLORS[i % len(SERIES_COLORS)]
+        datasets.append({
+            "label": label,
+            "data": vals,
+            "backgroundColor": color + "99",
+            "borderColor": color,
+            "borderWidth": 1,
+            "borderRadius": 2,
+        })
 
-    ax.set_xlabel("Problem Size (N)")
-    ax.set_ylabel("GFLOPS")
-    ax.set_title("HPL — High Performance Linpack")
-    all_sizes = sorted(set(d[1] for d in data))
-    ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
-    ax.set_xticklabels([str(s) for s in all_sizes])
-    _set_legend(ax, len(labels))
-    ax.grid(axis="y", alpha=0.3)
-
-    return _fig_to_base64(fig)
+    return _chart_canvas(
+        "bar",
+        {"labels": [str(s) for s in all_sizes], "datasets": datasets},
+        {
+            **_chart_default_opts(),
+            "plugins": {
+                **_chart_default_opts()["plugins"],
+                "legend": {"labels": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}},
+            },
+            "scales": {
+                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "y": {"beginAtZero": True, "title": {"display": True, "text": "GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+            },
+        },
+        title="HPL — High Performance Linpack",
+        aspect_ratio=1.8,
+    )
 
 
 def _chart_hpcg(results: list[dict[str, Any]]) -> str:
-    """Generate HPCG GFLOPS bar chart per grid size."""
+    """HPCG grouped bar chart per grid size."""
     data: list[tuple[str, int, float]] = []
     for r in results:
         if not r.get("success"):
@@ -394,35 +513,45 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
     if not data:
         return ""
 
-    fig, ax = plt.subplots(figsize=(10, 5))
     labels = sorted(set(d[0] for d in data))
     by_label: dict[str, list[tuple[int, float]]] = {l: [] for l in labels}
     for label, size, gflops in data:
         by_label[label].append((size, gflops))
 
-    width = 0.8 / max(len(labels), 1)
+    all_sizes = sorted(set(d[1] for d in data))
+    datasets = []
     for i, label in enumerate(labels):
         pairs = sorted(by_label[label])
-        sizes = [p[0] for p in pairs]
-        vals = [p[1] for p in pairs]
-        x = [j + i * width for j in range(len(sizes))]
-        ax.bar(x, vals, width, label=label, color=SERIES_COLORS[i % len(SERIES_COLORS)])
+        size_map = {s: v for s, v in pairs}
+        vals = [size_map.get(s, 0) for s in all_sizes]
+        color = SERIES_COLORS[i % len(SERIES_COLORS)]
+        datasets.append({
+            "label": label,
+            "data": vals,
+            "backgroundColor": color + "99",
+            "borderColor": color,
+            "borderWidth": 1,
+            "borderRadius": 2,
+        })
 
-    ax.set_xlabel("Grid Size (N×N×N)")
-    ax.set_ylabel("GFLOPS")
-    ax.set_title("HPCG — High Performance Conjugate Gradients")
-    all_sizes = sorted(set(d[1] for d in data))
-    ax.set_xticks([j + width * (len(labels) - 1) / 2 for j in range(len(all_sizes))])
-    ax.set_xticklabels([str(s) for s in all_sizes])
-    _set_legend(ax, len(labels))
-    ax.grid(axis="y", alpha=0.3)
-
-    return _fig_to_base64(fig)
+    return _chart_canvas(
+        "bar",
+        {"labels": [str(s) for s in all_sizes], "datasets": datasets},
+        {
+            **_chart_default_opts(),
+            "scales": {
+                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "y": {"beginAtZero": True, "title": {"display": True, "text": "GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+            },
+        },
+        title="HPCG — Conjugate Gradients",
+        aspect_ratio=1.8,
+    )
 
 
 def _chart_mlperf(results: list[dict[str, Any]]) -> str:
-    """Generate MLPerf throughput bar chart with accuracy annotation."""
-    data: list[tuple[str, float, float | None]] = []  # (label, qps, accuracy)
+    """MLPerf horizontal bar chart with accuracy annotation."""
+    data: list[tuple[str, float, float | None]] = []
     for r in results:
         if not r.get("success"):
             continue
@@ -440,29 +569,89 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
     if not data:
         return ""
 
-    fig, ax = plt.subplots(figsize=(10, max(3, len(data) * 0.4)))
     labels = [d[0] for d in data]
     vals = [d[1] for d in data]
+    annotations = []
+    for _, _, acc in data:
+        annotations.append(f"{acc:.1f}%" if acc is not None else "")
 
-    bars = ax.barh(range(len(labels)), vals, color=SERIES_COLORS[:len(labels)])
-    for bar, val, (_, _, acc) in zip(bars, vals, data):
-        txt = f"{val:.1f}"
-        if acc is not None:
-            txt += f"  ({acc:.1f}%)"
-        ax.text(bar.get_width() + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
-                txt, va="center", fontsize=9)
+    datasets = [{
+        "label": "Throughput (qps)",
+        "data": vals,
+        "backgroundColor": [ACCENT + "99" for _ in vals],
+        "borderColor": ACCENT,
+        "borderWidth": 1,
+        "borderRadius": 2,
+    }]
 
-    ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels, fontsize=8)
-    ax.set_xlabel("Throughput (queries / second)")
-    ax.set_title("MLPerf Inference — Throughput & Accuracy")
-    ax.grid(axis="x", alpha=0.3)
-    fig.tight_layout()
-    return _fig_to_base64(fig)
+    chart_id = "ch-mlperf"
+    labels_json = json.dumps(labels)
+    vals_json = json.dumps(vals)
+    annot_json = json.dumps(annotations)
+
+    script = f"""
+<script>
+(function() {{
+  var ctx = document.getElementById('{chart_id}');
+  if (!ctx || !window.Chart) return;
+  new Chart(ctx.getContext('2d'), {{
+    type: 'bar',
+    data: {{
+      labels: {labels_json},
+      datasets: [{{
+        label: 'Throughput (qps)',
+        data: {vals_json},
+        backgroundColor: '{ACCENT}99',
+        borderColor: '{ACCENT}',
+        borderWidth: 1,
+        borderRadius: 2,
+      }}]
+    }},
+    options: Object.assign({{}}, {json.dumps(_chart_default_opts())}, {{
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.2,
+      plugins: {{
+        legend: {{ display: false }},
+        tooltip: {{
+          enabled: true,
+          backgroundColor: '{SURFACE}',
+          titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+          bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+          borderColor: '{BORDER}',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 6,
+          callbacks: {{
+            afterBody: function(items) {{
+              var idx = items[0].dataIndex;
+              var annots = {annot_json};
+              return annots[idx] ? 'Accuracy: ' + annots[idx] : '';
+            }}
+          }}
+        }},
+      }},
+      scales: {{
+        x: {{ beginAtZero: true, title: {{display: true, text: 'Throughput (queries / second)', color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}}, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+        y: {{ grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{TEXT}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+      }},
+    }})
+  }});
+}})();
+</script>"""
+
+    return f"""<details class="chart" open>
+<summary>MLPerf Inference — Throughput & Accuracy</summary>
+<div class="chart-inner">
+  <canvas id="{chart_id}"></canvas>
+</div>
+</details>
+{script}"""
 
 
 def _chart_summary(results: list[dict[str, Any]]) -> str:
-    """Generate a summary dashboard: pass/fail per benchmark + avg performance."""
+    """Summary dashboard: pass/fail per benchmark + avg performance."""
     bench_stats: dict[str, dict[str, Any]] = {}
     for r in results:
         name = r["benchmark"]
@@ -479,22 +668,9 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
     if not bench_stats:
         return ""
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
     names = list(bench_stats.keys())
     passed = [bench_stats[n]["passed"] for n in names]
     failed = [bench_stats[n]["total"] - bench_stats[n]["passed"] for n in names]
-
-    x = range(len(names))
-    w = 0.35
-    ax1.bar([i - w/2 for i in x], passed, w, label="Passed", color="#28a745")
-    ax1.bar([i + w/2 for i in x], failed, w, label="Failed", color="#dc3545")
-    ax1.set_xticks(list(x))
-    ax1.set_xticklabels(names)
-    ax1.set_ylabel("Run Count")
-    ax1.set_title("Pass / Fail by Benchmark")
-    _set_legend(ax1, 2)
-    ax1.grid(axis="y", alpha=0.3)
 
     perf_names = []
     perf_vals = []
@@ -503,20 +679,87 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
         if vals:
             perf_names.append(n)
             perf_vals.append(sum(vals) / len(vals))
-    if perf_names:
-        bars = ax2.barh(perf_names, perf_vals, color=SERIES_COLORS[:len(perf_names)])
-        for bar, val in zip(bars, perf_vals):
-            ax2.text(bar.get_width() + max(perf_vals) * 0.01, bar.get_y() + bar.get_height() / 2,
-                    f"{val:.1f}", va="center", fontsize=9)
-        ax2.set_xlabel("Avg GFLOPS")
-        ax2.set_title("Average Performance by Benchmark")
-        ax2.grid(axis="x", alpha=0.3)
-    else:
-        ax2.text(0.5, 0.5, "No performance data", ha="center", va="center",
-                transform=ax2.transAxes, color="gray")
 
-    fig.tight_layout()
-    return _fig_to_base64(fig)
+    # Pass/fail bar chart
+    pass_fail_data = {
+        "labels": names,
+        "datasets": [
+            {
+                "label": "Passed",
+                "data": passed,
+                "backgroundColor": ACCENT + "99",
+                "borderColor": ACCENT,
+                "borderWidth": 1,
+                "borderRadius": 2,
+            },
+            {
+                "label": "Failed",
+                "data": failed,
+                "backgroundColor": ACCENT_FAIL + "99",
+                "borderColor": ACCENT_FAIL,
+                "borderWidth": 1,
+                "borderRadius": 2,
+            },
+        ],
+    }
+
+    pass_fail_html = _chart_canvas(
+        "bar",
+        pass_fail_data,
+        {
+            **_chart_default_opts(),
+            "plugins": {
+                **_chart_default_opts()["plugins"],
+                "legend": {"labels": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}},
+            },
+            "scales": {
+                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "y": {"beginAtZero": True, "title": {"display": True, "text": "Run Count", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+            },
+        },
+        title="Pass / Fail by Benchmark",
+        aspect_ratio=1.8,
+    )
+
+    if not perf_names:
+        return pass_fail_html + '<p class="no-data">No performance data available.</p>'
+
+    # Avg performance horizontal bar
+    perf_data = {
+        "labels": perf_names,
+        "datasets": [{
+            "label": "Avg GFLOPS",
+            "data": perf_vals,
+            "backgroundColor": [SERIES_COLORS[i % len(SERIES_COLORS)] + "99" for i in range(len(perf_names))],
+            "borderColor": [SERIES_COLORS[i % len(SERIES_COLORS)] for i in range(len(perf_names))],
+            "borderWidth": 1,
+            "borderRadius": 2,
+        }],
+    }
+
+    perf_html = _chart_canvas(
+        "bar",
+        perf_data,
+        {
+            **_chart_default_opts(),
+            "indexAxis": "y",
+            "plugins": {
+                **_chart_default_opts()["plugins"],
+                "legend": {"display": False},
+            },
+            "scales": {
+                "x": {"beginAtZero": True, "title": {"display": True, "text": "Avg GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "y": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": TEXT, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+            },
+        },
+        title="Average Performance by Benchmark",
+        aspect_ratio=1.8,
+    )
+
+    return pass_fail_html + "\n" + perf_html
+
+
+# ── Main report HTML template ──
 
 
 def generate_report(
@@ -543,6 +786,7 @@ def generate_report(
     # Generate charts
     charts: dict[str, str] = {}
     for name, func in [
+        ("summary", _chart_summary),
         ("bandwidth", _chart_bandwidth),
         ("matmul", _chart_matmul),
         ("tiled_matmul", _chart_tiled_matmul),
@@ -550,7 +794,6 @@ def generate_report(
         ("hpl", _chart_hpl),
         ("hpcg", _chart_hpcg),
         ("mlperf", _chart_mlperf),
-        ("summary", _chart_summary),
     ]:
         try:
             charts[name] = func(results)
@@ -634,19 +877,10 @@ def _render_html(
         ("hpcg", "HPCG — Conjugate Gradients"),
         ("mlperf", "MLPerf Inference — Throughput"),
     ]
-    for key, label in _CHART_NAMES:
+    for key, _label in _CHART_NAMES:
         content = charts.get(key)
-        if not content:
-            continue
-        if content.startswith(("<div", "<details")):
+        if content:
             chart_html += content + "\n"
-        else:
-            chart_html += (
-                f'<details class="chart">'
-                f'<summary>{label}</summary>'
-                f'<img src="{content}" alt="{label}">'
-                f'</details>\n'
-            )
 
     bench_tables = _render_benchmark_tables(results)
 
@@ -656,82 +890,118 @@ def _render_html(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root {{
-    --accent: {COLORS['accent']};
-    --accent-dark: {COLORS['accent_dark']};
-    --accent-light: {COLORS['accent_light']};
-    --bg: {COLORS['bg']};
-    --surface: {COLORS['surface']};
-    --sidebar-bg: {COLORS['sidebar_bg']};
-    --sidebar-width: 240px;
-    --border: {COLORS['border']};
-    --text: {COLORS['text']};
-    --muted: {COLORS['muted']};
+    --accent: {ACCENT};
+    --accent-warn: {ACCENT_WARN};
+    --accent-fail: {ACCENT_FAIL};
+    --bg: {BG};
+    --surface: {SURFACE};
+    --text: {TEXT};
+    --muted: {MUTED};
+    --border: {BORDER};
+    --sidebar-width: 220px;
+    --radius: {RADIUS};
+    --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }}
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 [id] {{ scroll-margin-top: 1.5rem; }}
 body {{
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: var(--text); line-height: 1.5; background: var(--bg);
+    font-family: var(--font-sans);
+    color: var(--text);
+    line-height: 1.5;
+    background: var(--bg);
 }}
 .sidebar {{
     position: fixed; top: 0; left: 0; bottom: 0;
-    width: var(--sidebar-width); background: var(--sidebar-bg);
+    width: var(--sidebar-width); background: {SIDEBAR_BG};
     display: flex; flex-direction: column; overflow: hidden; z-index: 200;
+    border-right: 1px solid var(--border);
 }}
 .sidebar-header {{
-    padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: center;
+    padding: 1.2rem 1rem; border-bottom: 1px solid var(--border); text-align: center;
 }}
-.sidebar-title {{ font-size: 0.9rem; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: 0.03em; }}
-.sidebar-subtitle {{ font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-top: 0.2rem; }}
+.sidebar-header svg,
+.sidebar-header img {{ width: 72px; height: 72px; margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto; }}
+.sidebar-title {{ font-size: 0.95rem; font-weight: 700; color: var(--accent); font-family: var(--font-mono); letter-spacing: 0.02em; }}
+.sidebar-subtitle {{ font-size: 0.65rem; color: var(--muted); margin-top: 0.15rem; font-family: var(--font-mono); }}
+.sidebar-section {{ padding: 0.8rem 1rem 0.3rem; font-size: 0.65rem; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }}
 .sidebar-link {{
-    display: block; padding: 0.5rem 1rem; color: rgba(255,255,255,0.7);
-    text-decoration: none; font-size: 0.85rem; border-left: 3px solid transparent;
+    display: block; padding: 0.45rem 1rem; color: var(--muted);
+    text-decoration: none; font-size: 0.82rem; font-family: var(--font-mono);
+    border-left: 3px solid transparent;
     transition: background 0.12s, color 0.12s;
 }}
-.sidebar-link:hover {{ background: rgba(255,255,255,0.07); color: #fff; }}
-.sidebar-link.active {{ background: rgba(15,108,189,0.28); color: #fff; border-left-color: var(--accent); }}
-.sidebar-section {{ padding: 0.8rem 1rem 0.3rem; font-size: 0.7rem; font-weight: 700;
-    color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.08em; }}
+.sidebar-link:hover {{ background: rgba(255,255,255,0.05); color: var(--text); }}
+.sidebar-link.active {{ background: rgba(57,255,136,0.1); color: var(--accent); border-left-color: var(--accent); }}
 .main-content {{ margin-left: var(--sidebar-width); min-height: 100vh; padding: 2rem 2.5rem 4rem; }}
-h1 {{ font-size: 1.8rem; margin-bottom: 0.3rem; }}
-h2 {{ font-size: 1.3rem; margin: 2rem 0 0.8rem; color: var(--accent-dark);
-    border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; }}
-h3 {{ font-size: 1.05rem; margin: 1.2rem 0 0.5rem; }}
-.subtitle {{ color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }}
+h1 {{ font-size: 1.6rem; margin-bottom: 0.2rem; font-family: var(--font-mono); font-weight: 700; }}
+h2 {{ font-size: 1.2rem; margin: 2rem 0 0.8rem; color: var(--accent); font-family: var(--font-mono);
+    border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }}
+h3 {{ font-size: 1rem; margin: 1.2rem 0 0.5rem; font-family: var(--font-mono); color: var(--accent); }}
+.subtitle {{ color: var(--muted); margin-bottom: 1.5rem; font-size: 0.85rem; font-family: var(--font-mono); }}
 table {{ width: 100%; border-collapse: collapse; margin: 0.8rem 0 1.5rem; background: var(--surface);
-    border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
-th {{ background: var(--accent); color: #fff; padding: 0.6rem 0.8rem; text-align: left; font-size: 0.85rem;
-    position: sticky; top: 0; z-index: 1; }}
-td {{ padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }}
-tr:hover td {{ background: var(--accent-light); }}
-.env-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; margin: 1rem 0; }}
-.env-card {{ background: var(--surface); border-radius: 8px; padding: 0.8rem 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
-.env-card .label {{ font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }}
-.env-card .value {{ font-size: 1.1rem; font-weight: 600; }}
-.badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }}
-.badge-ok {{ background: #D4EDDA; color: #155724; }}
-.badge-fail {{ background: #F8D7DA; color: #721C24; }}
-.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }}
-.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;
-    background: var(--surface); user-select: none; }}
-.chart summary:hover {{ background: var(--accent-light); }}
+    border-radius: var(--radius); overflow: hidden; }}
+th {{ background: var(--surface); color: var(--accent); padding: 0.6rem 0.8rem; text-align: left; font-size: 0.8rem;
+    font-family: var(--font-mono); font-weight: 600; border-bottom: 1px solid var(--border); }}
+td {{ padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-mono); }}
+tr:hover td {{ background: rgba(57,255,136,0.04); }}
+.env-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; margin: 1rem 0; }}
+.env-card {{ background: var(--surface); border-radius: var(--radius); padding: 0.8rem 1rem;
+    border: 1px solid var(--border); }}
+.env-card .label {{ font-size: 0.65rem; color: var(--muted); text-transform: uppercase; font-family: var(--font-mono); letter-spacing: 0.04em; }}
+.env-card .value {{ font-size: 1.1rem; font-weight: 700; color: var(--accent); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }}
+.badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }}
+.badge-ok {{ background: rgba(57,255,136,0.12); color: var(--accent); }}
+.badge-fail {{ background: rgba(255,92,92,0.12); color: var(--accent-fail); }}
+.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }}
+.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+    font-family: var(--font-mono); color: var(--text); user-select: none; }}
+.chart summary:hover {{ background: rgba(57,255,136,0.04); }}
 .chart[open] summary {{ border-bottom: 1px solid var(--border); }}
+.chart-toolbar {{
+    display: flex; gap: 1rem; padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15);
+    flex-wrap: wrap;
+}}
+.chart-toolbar label {{
+    font-size: 0.78rem; color: var(--muted); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.3rem;
+}}
+.chart-toolbar select {{
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.78rem; font-family: var(--font-mono);
+    cursor: pointer;
+}}
+.chart-toolbar select:hover {{ border-color: var(--accent); }}
+.chart-inner {{ padding: 1rem; position: relative; }}
+.chart-inner canvas {{ max-width: 100%; }}
 .chart img {{ max-width: 100%; display: block; padding: 1rem; box-sizing: border-box; }}
-.metrics-details summary {{ font-size:0.8rem;cursor:pointer;color:var(--accent); }}
+.metrics-details summary {{ font-size:0.78rem;cursor:pointer;color:var(--accent);font-family:var(--font-mono); }}
 .metrics-details[open] summary {{ margin-bottom:0.3rem; }}
-.metrics-content {{ font-size:0.75rem;word-break:break-all;max-height:200px;overflow-y:auto; }}
+.metrics-content {{ font-size:0.72rem;word-break:break-all;max-height:200px;overflow-y:auto;font-family:var(--font-mono);color:var(--muted); }}
+.no-data {{ color: var(--muted); font-size: 0.85rem; font-family: var(--font-mono); padding: 1rem; }}
 footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
-    color: var(--muted); font-size: 0.75rem; text-align: center; }}
+    color: var(--muted); font-size: 0.72rem; font-family: var(--font-mono); text-align: center; }}
+@media (max-width: 768px) {{
+    .sidebar {{ width: 180px; }}
+    .main-content {{ margin-left: 180px; padding: 1.5rem; }}
+    .env-grid {{ grid-template-columns: 1fr 1fr; }}
+}}
+@media (max-width: 520px) {{
+    .sidebar {{ width: 100%; position: static; border-right: none; border-bottom: 1px solid var(--border); }}
+    .main-content {{ margin-left: 0; padding: 1rem; }}
+    .env-grid {{ grid-template-columns: 1fr; }}
+    .chart-toolbar {{ flex-direction: column; gap: 0.4rem; }}
+}}
 </style>
 </head>
 <body>
 <nav class="sidebar">
     <div class="sidebar-header">
-        {'<img src="nvprobe.svg" alt="nvProbe" style="width:80px;margin-bottom:0.5rem;">' if has_logo else ''}
+        {'<img src="nvprobe.svg" alt="nvProbe" style="width:72px;margin-bottom:0.5rem;">' if has_logo else ''}
         <div class="sidebar-title">nvProbe</div>
         <div class="sidebar-subtitle">GPU Benchmark Suite</div>
     </div>
@@ -760,7 +1030,7 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
     </table>
 
     <h2 id="charts">Performance Charts</h2>
-    {chart_html if chart_html else '<p style="color:var(--muted)">No chart data available. Run benchmarks with CUDA-enabled GPUs to generate charts.</p>'}
+    {chart_html if chart_html else '<p class="no-data">No chart data available. Run benchmarks with CUDA-enabled GPUs to generate charts.</p>'}
 
     <h2 id="results">Detailed Results</h2>
     {bench_tables}
@@ -796,7 +1066,7 @@ def _render_benchmark_tables(results: list[dict[str, Any]]) -> str:
                 metrics_cell = metrics_str
             html += f"<tr><td>{r['gpu_index']}</td><td>{r['gpu_model']}</td><td>{r['precision']}</td>"
             html += f"<td>{r['batch_size']}</td><td>{status_badge}</td><td>{r.get('elapsed_seconds', '')}</td>"
-            html += f"<td style='font-size:0.8rem'>{metrics_cell}</td></tr>\n"
+            html += f"<td style='font-size:0.78rem'>{metrics_cell}</td></tr>\n"
         html += "</table>\n"
     return html
 
@@ -831,7 +1101,7 @@ def _render_comparison_html(
     env_b: dict[str, Any],
 ) -> str:
     """Render comparison HTML between two runs with side-by-side charts."""
-    # Build comparison chart
+    # Build comparison chart data
     all_labels = []
     all_vals_a = []
     all_vals_b = []
@@ -859,22 +1129,74 @@ def _render_comparison_html(
                     if isinstance(v, dict) and "gflops" in v:
                         all_vals_b.append(v["gflops"])
 
-    chart_b64 = ""
+    chart_html = ""
     if all_labels and all_vals_a and all_vals_b:
-        fig, ax = plt.subplots(figsize=(12, 6))
-        x = range(len(all_labels))
-        w = 0.35
-        ax.bar([i - w/2 for i in x], all_vals_a[:len(all_labels)], w, label=run_a["name"], color=SERIES_COLORS[0])
-        ax.bar([i + w/2 for i in x], all_vals_b[:len(all_labels)], w, label=run_b["name"], color=SERIES_COLORS[1])
-        ax.set_xticks(list(x))
-        ax.set_xticklabels(all_labels, rotation=45, ha="right", fontsize=8)
-        ax.set_ylabel("GFLOPS")
-        ax.set_title("Performance Comparison")
-        ax.legend()
-        ax.grid(axis="y", alpha=0.3)
-        chart_b64 = _fig_to_base64(fig)
+        labels_json = json.dumps(all_labels)
+        vals_a_json = json.dumps(all_vals_a[:len(all_labels)])
+        vals_b_json = json.dumps(all_vals_b[:len(all_labels)])
+        name_a = run_a["name"]
+        name_b = run_b["name"]
 
-    chart_html = f'<details class="chart"><summary>Performance Comparison</summary><img src="{chart_b64}" alt="Comparison"></details>' if chart_b64 else ""
+        chart_html = f"""<details class="chart" open>
+<summary>Performance Comparison</summary>
+<div class="chart-inner">
+  <canvas id="ch-compare"></canvas>
+</div>
+</details>
+<script>
+(function() {{
+  var ctx = document.getElementById('ch-compare');
+  if (!ctx || !window.Chart) return;
+  new Chart(ctx.getContext('2d'), {{
+    type: 'bar',
+    data: {{
+      labels: {labels_json},
+      datasets: [
+        {{
+          label: '{name_a}',
+          data: {vals_a_json},
+          backgroundColor: '{ACCENT}99',
+          borderColor: '{ACCENT}',
+          borderWidth: 1,
+          borderRadius: 2,
+        }},
+        {{
+          label: '{name_b}',
+          data: {vals_b_json},
+          backgroundColor: '{ACCENT_WARN}99',
+          borderColor: '{ACCENT_WARN}',
+          borderWidth: 1,
+          borderRadius: 2,
+        }},
+      ]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.8,
+      plugins: {{
+        legend: {{ labels: {{ color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}, boxWidth: 14, padding: 14 }} }},
+        tooltip: {{
+          enabled: true,
+          backgroundColor: '{SURFACE}',
+          titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+          bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+          borderColor: '{BORDER}',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 6,
+          titleColor: '{TEXT}',
+          bodyColor: '{TEXT}',
+        }},
+      }},
+      scales: {{
+        x: {{ grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 9}}, maxRotation: 45}} }},
+        y: {{ beginAtZero: true, title: {{display: true, text: 'GFLOPS', color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}}}, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+      }},
+    }}
+  }});
+}})();
+</script>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -882,30 +1204,53 @@ def _render_comparison_html(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>nvProbe Comparison</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-:root {{ --accent: {COLORS['accent']}; --bg: {COLORS['bg']}; --surface: {COLORS['surface']};
-    --border: {COLORS['border']}; --text: {COLORS['text']}; --muted: {COLORS['muted']}; }}
+:root {{
+    --accent: {ACCENT};
+    --accent-warn: {ACCENT_WARN};
+    --accent-fail: {ACCENT_FAIL};
+    --bg: {BG};
+    --surface: {SURFACE};
+    --text: {TEXT};
+    --muted: {MUTED};
+    --border: {BORDER};
+    --radius: {RADIUS};
+    --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}}
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{ font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); padding: 2rem; }}
-h1 {{ color: var(--accent); margin-bottom: 0.5rem; }}
-h2 {{ margin: 2rem 0 0.8rem; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; }}
-.run-info {{ display: flex; gap: 2rem; margin: 1rem 0; }}
-.run-card {{ background: var(--surface); padding: 1rem; border-radius: 8px; flex: 1;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
-.run-card h3 {{ margin-bottom: 0.5rem; }}
-table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; background: var(--surface);
-    border-radius: 8px; overflow: hidden; }}
-th {{ background: var(--accent); color: #fff; padding: 0.6rem; text-align: left; font-size: 0.85rem; }}
-td {{ padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }}
-.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }}
-.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;
-    background: var(--surface); user-select: none; }}
-.chart summary:hover {{ background: var(--accent-light); }}
+body {{
+    font-family: var(--font-sans);
+    background: var(--bg); color: var(--text); padding: 2rem; line-height: 1.5;
+}}
+h1 {{ font-size: 1.6rem; margin-bottom: 0.3rem; font-family: var(--font-mono); color: var(--accent); }}
+h2 {{ font-size: 1.2rem; margin: 2rem 0 0.8rem; color: var(--accent); font-family: var(--font-mono);
+    border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }}
+.run-info {{ display: flex; gap: 1.5rem; margin: 1rem 0; flex-wrap: wrap; }}
+.run-card {{ background: var(--surface); padding: 1rem; border-radius: var(--radius); flex: 1; min-width: 200px;
+    border: 1px solid var(--border); }}
+.run-card h3 {{ margin-bottom: 0.3rem; font-family: var(--font-mono); font-size: 1rem; }}
+.run-card p {{ color: var(--muted); font-size: 0.82rem; font-family: var(--font-mono); }}
+table {{ width: 100%; border-collapse: collapse; margin: 0.8rem 0 1.5rem; background: var(--surface);
+    border-radius: var(--radius); overflow: hidden; }}
+th {{ background: var(--surface); color: var(--accent); padding: 0.6rem 0.8rem; text-align: left; font-size: 0.8rem;
+    font-family: var(--font-mono); font-weight: 600; border-bottom: 1px solid var(--border); }}
+td {{ padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-mono); }}
+tr:hover td {{ background: rgba(57,255,136,0.04); }}
+.chart {{ margin: 0.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }}
+.chart summary {{ padding: 0.6rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+    font-family: var(--font-mono); color: var(--text); user-select: none; }}
+.chart summary:hover {{ background: rgba(57,255,136,0.04); }}
 .chart[open] summary {{ border-bottom: 1px solid var(--border); }}
-.chart img {{ max-width: 100%; display: block; padding: 1rem; box-sizing: border-box; }}
-.badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }}
-.badge-ok {{ background: #D4EDDA; color: #155724; }}
-.badge-fail {{ background: #F8D7DA; color: #721C24; }}
+.chart-inner {{ padding: 1rem; }}
+.badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }}
+.badge-ok {{ background: rgba(57,255,136,0.12); color: var(--accent); }}
+.badge-fail {{ background: rgba(255,92,92,0.12); color: var(--accent-fail); }}
+@media (max-width: 640px) {{
+    body {{ padding: 1rem; }}
+    .run-info {{ flex-direction: column; }}
+}}
 </style>
 </head>
 <body>
@@ -924,7 +1269,7 @@ td {{ padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size:
 </div>
 
 <h2>Performance Comparison</h2>
-{chart_html if chart_html else '<p style="color:var(--muted)">No comparable data found between runs.</p>'}
+{chart_html if chart_html else '<p style="color:var(--muted);font-family:var(--font-mono)">No comparable data found between runs.</p>'}
 
 <h2>Results A — {run_a['name']}</h2>
 {_render_benchmark_tables(results_a)}

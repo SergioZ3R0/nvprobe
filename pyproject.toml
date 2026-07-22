@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nvprobe"
-version = "0.6.2"
+version = "0.7.0"
 description = "NVIDIA GPU benchmark suite for CUDA workload automation, reporting, and comparison"
 readme = "README.md"
 license = "Apache-2.0"
@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SergioZ3R0/nvprobe"
+Homepage = "https://nvprobe.scszero.com/"
 Repository = "https://github.com/SergioZ3R0/nvprobe"
 Issues = "https://github.com/SergioZ3R0/nvprobe/issues"
 

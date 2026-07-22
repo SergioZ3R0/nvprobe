@@ -5,7 +5,8 @@
 <h1 align="center">nvProbe</h1>
 <p align="center">
   <b>NVIDIA GPU &amp; CUDA Benchmark Suite</b><br>
-  <i>Automate CUDA workloads &bull; HPL &amp; HPCG &bull; MLPerf inference &bull; Custom kernels &bull; Interactive reports</i>
+  <i>Automate CUDA workloads &bull; HPL &amp; HPCG &bull; MLPerf inference &bull; Custom kernels &bull; Interactive reports</i><br>
+  <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a>
 </p>
 
 <p align="center">
@@ -31,7 +32,7 @@ pip install nvprobe && nvprobe setup && nvprobe run --local
 
 - **Bundled CUDA runtime** &mdash; CuPy `[ctk]` via pip, no system toolkit required
 - **Auto-downloaded HPC tools** &mdash; NVIDIA HPC Benchmarks cached in `~/.nvprobe/tools/`
-- **Interactive HTML reports** &mdash; Plotly charts with GPU / transfer / precision dropdowns
+- **Interactive HTML reports** &mdash; Chart.js charts with GPU / transfer / precision dropdowns and oscilloscope-style glow
 - **A/B comparison** &mdash; compare two result sets side-by-side
 - **Slurm integration** &mdash; generate, submit, monitor, collect from HPC clusters
 - **SQLite storage** &mdash; all results persisted; CSV / JSON export
@@ -64,7 +65,7 @@ pip install -e . && nvprobe setup && nvprobe run --local
 
 ## Charts
 
-Plotly charts with interactive controls:
+Chart.js canvas-based charts with interactive controls:
 
 - **Bandwidth** &mdash; filter by GPU and transfer type (H2D / D2H / D2D)
 - **MatMul / Attention** &mdash; filter by GPU and precision (fp32 / fp16)
