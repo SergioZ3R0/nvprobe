@@ -16,6 +16,10 @@
   <img src="https://img.shields.io/badge/CUDA-12%20%7C%2013-76b900?style=flat&logo=nvidia" alt="CUDA">
 </p>
 
+<div align="center">
+  <img src="nvprobe_example.gif" alt="nvprobe interactive report demo" width="800">
+</div>
+
 ```bash
 pip install nvprobe && nvprobe setup && nvprobe run --local
 ```
