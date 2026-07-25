@@ -269,7 +269,51 @@ def fingerprint_environment() -> dict[str, Any]:
         except Exception:
             pass
 
+    # Enrich GPUs with diagnostic data (clocks, power, ECC, PCIe link state)
+    _enrich_gpu_diagnostics(info["gpus"])
+
     return info
+
+
+def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
+    """Query per-GPU diagnostic fields and merge into GPU dicts."""
+    if not gpus:
+        return
+    for gpu in gpus:
+        idx = gpu["index"]
+        rows = _nvidia_smi_query(
+            "clocks.sm", "clocks.mem",
+            "power.limit", "power.draw",
+            "ecc.mode.current",
+            "ecc.errors.corrected.volatile.total",
+            "ecc.errors.uncorrected.volatile.total",
+            "pcie.link.gen.current", "pcie.link.width.current",
+            gpu_index=idx,
+        )
+        if not rows:
+            continue
+        parts = rows[0].split(",")
+        if len(parts) >= 9:
+            gpu["clock_sm_mhz"] = _parse_int_or_none(parts[0])
+            gpu["clock_mem_mhz"] = _parse_int_or_none(parts[1])
+            gpu["power_limit_w"] = _parse_int_or_none(parts[2])
+            gpu["power_draw_w"] = _parse_int_or_none(parts[3])
+            gpu["ecc_mode"] = parts[4].strip()
+            gpu["ecc_errors_corrected"] = _parse_int_or_none(parts[5])
+            gpu["ecc_errors_uncorrected"] = _parse_int_or_none(parts[6])
+            gpu["pcie_gen"] = _parse_int_or_none(parts[7])
+            gpu["pcie_width"] = _parse_int_or_none(parts[8])
+
+
+def _parse_int_or_none(value: str) -> int | None:
+    """Parse an integer from nvidia-smi output, returning None on failure."""
+    try:
+        v = value.strip()
+        if v in ("", "N/A", "Unknown", "Not Supported"):
+            return None
+        return int(v)
+    except (ValueError, TypeError):
+        return None
 
 
 def _run_cmd_safe(cmd: list[str]) -> str:

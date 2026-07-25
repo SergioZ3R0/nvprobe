@@ -865,7 +865,20 @@ def _render_html(
     gpus = env_info.get("gpus", [])
     gpu_rows = ""
     for g in gpus:
-        gpu_rows += f"<tr><td>{g['index']}</td><td>{g['model']}</td><td>{g['memory_total_mb']} MB</td></tr>\n"
+        sm = g.get("clock_sm_mhz")
+        mem = g.get("clock_mem_mhz")
+        pwr = g.get("power_limit_w")
+        ecc = g.get("ecc_mode", "")
+        gen = g.get("pcie_gen")
+        width = g.get("pcie_width")
+        gpu_rows += (
+            f"<tr><td>{g['index']}</td><td>{g['model']}</td><td>{g['memory_total_mb']} MB</td>"
+            f"<td>{sm if sm is not None else '—'} MHz</td>"
+            f"<td>{mem if mem is not None else '—'} MHz</td>"
+            f"<td>{pwr if pwr is not None else '—'} W</td>"
+            f"<td>{ecc if ecc else '—'}</td>"
+            f"<td>{f'Gen{gen} x{width}' if (gen and width) else '—'}</td></tr>\n"
+        )
 
     chart_html = ""
     _CHART_NAMES = [
@@ -1048,7 +1061,7 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
 
     <h2 id="environment">Environment</h2>
     <table>
-        <tr><th>GPU #</th><th>Model</th><th>Memory</th></tr>
+        <tr><th>GPU#</th><th>Model</th><th>Memory</th><th>SM Clock</th><th>Mem Clock</th><th>Power Limit</th><th>ECC</th><th>PCIe</th></tr>
         {gpu_rows}
     </table>
 
