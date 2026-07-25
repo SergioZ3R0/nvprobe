@@ -282,12 +282,12 @@ def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
     for gpu in gpus:
         idx = gpu["index"]
         rows = _nvidia_smi_query(
-            "clocks.sm", "clocks.mem",
+            "clocks.max.sm", "clocks.max.mem",
             "power.limit", "power.draw",
             "ecc.mode.current",
             "ecc.errors.corrected.volatile.total",
             "ecc.errors.uncorrected.volatile.total",
-            "pcie.link.gen.current", "pcie.link.width.current",
+            "pcie.link.gen.max", "pcie.link.width.max",
             gpu_index=idx,
         )
         if not rows:
