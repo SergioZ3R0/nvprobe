@@ -138,6 +138,7 @@ def _do_init(force: bool = False) -> None:
 
 def _detect_cuda_major() -> str | None:
     """Detect CUDA major version via nvcc or nvidia-smi."""
+    import shutil
     import subprocess
     nvcc = shutil.which("nvcc")
     if nvcc:

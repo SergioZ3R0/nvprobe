@@ -49,7 +49,7 @@ cupy-cuda12x = ["cupy-cuda12x[ctk]>=13.0"]
 cupy-cuda13x = ["cupy-cuda13x[ctk]>=13.0"]
 
 [tool.setuptools.packages.find]
-include = ["nvprobe*", "tests*"]
+include = ["nvprobe*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

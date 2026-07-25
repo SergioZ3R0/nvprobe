@@ -244,7 +244,6 @@ class HplBenchmark(BaseBenchmark):
 
 def _parse_hpl_output(output: str) -> float:
     lines = output.splitlines()
-    best = 0.0
     for i, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("---"):
@@ -268,4 +267,4 @@ def _parse_hpl_output(output: str) -> float:
                     return float(token)
                 except ValueError:
                     continue
-    return best
+    return 0.0
