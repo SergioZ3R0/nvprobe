@@ -572,6 +572,20 @@ def subprocess_env() -> dict[str, str]:
     return env
 
 
+def _find_mpi_run() -> str | None:
+    for name in ["mpirun", "srun"]:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+
+def _build_env(gpu_index: int) -> dict[str, str]:
+    env = subprocess_env()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+    return env
+
+
 @dataclass
 class BenchmarkResult:
     """Result from a single benchmark execution."""

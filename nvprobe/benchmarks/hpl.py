@@ -10,16 +10,9 @@ from pathlib import Path
 
 from nvprobe.benchmarks.base import (
     BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
-    _detect_gpu_model, _diagnose_missing_lib, subprocess_env,
+    _build_env, _detect_gpu_model, _diagnose_missing_lib,
+    _find_mpi_run, subprocess_env,
 )
-
-
-def _find_mpi_run() -> str | None:
-    for name in ["mpirun", "srun"]:
-        path = shutil.which(name)
-        if path:
-            return path
-    return None
 
 
 def _get_gpu_memory_mb(gpu_index: int) -> int | None:
@@ -80,12 +73,6 @@ def _generate_hpl_dat(n: int, nb: int = 1024, p: int = 1, q: int = 1) -> str:
         f"1            Equilibration (0=no,1=yes)\n"
         f"8            memory alignment in (>0)\n"
     )
-
-
-def _build_env(gpu_index: int) -> dict[str, str]:
-    env = subprocess_env()
-    env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
-    return env
 
 
 def _run_hpl_size(

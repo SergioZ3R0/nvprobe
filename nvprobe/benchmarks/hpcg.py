@@ -9,7 +9,8 @@ from pathlib import Path
 
 from nvprobe.benchmarks.base import (
     BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
-    _detect_gpu_model, _diagnose_missing_lib, subprocess_env,
+    _build_env, _detect_gpu_model, _diagnose_missing_lib,
+    _find_mpi_run, subprocess_env,
 )
 
 # Heuristic: bytes per grid point for HPCG GPU memory (CSR matrix + vectors + workspace).
@@ -123,20 +124,6 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
         )
 
     return True, ""
-
-
-def _find_mpi_run() -> str | None:
-    for name in ["mpirun", "srun"]:
-        path = shutil.which(name)
-        if path:
-            return path
-    return None
-
-
-def _build_env(gpu_index: int) -> dict[str, str]:
-    env = subprocess_env()
-    env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
-    return env
 
 
 def _run_hpcg_size(
