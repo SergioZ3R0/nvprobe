@@ -304,6 +304,10 @@ def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
             gpu["pcie_gen"] = _parse_int_or_none(parts[7])
             gpu["pcie_width"] = _parse_int_or_none(parts[8])
 
+        nv_rows = _nvidia_smi_query("nvlink.active.links", gpu_index=idx)
+        if nv_rows:
+            gpu["nvlink_active_links"] = _parse_int_or_none(nv_rows[0])
+
 
 def _parse_int_or_none(value: str) -> int | None:
     """Parse an integer from nvidia-smi output, returning None on failure."""
