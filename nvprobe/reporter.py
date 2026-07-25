@@ -1155,9 +1155,9 @@ def _render_comparison_html(
 ) -> str:
     """Render comparison HTML between two runs with side-by-side charts."""
     # Build comparison chart data
-    all_labels = []
-    all_vals_a = []
-    all_vals_b = []
+    # Collect gflops values keyed by (benchmark, gpu, precision) for proper alignment
+    pairs_a: dict[str, list[float]] = {}
+    pairs_b: dict[str, list[float]] = {}
 
     for r in results_a:
         if not r.get("success"):
@@ -1168,8 +1168,7 @@ def _render_comparison_html(
             if isinstance(kernel_data, dict):
                 for v in kernel_data.values():
                     if isinstance(v, dict) and "gflops" in v:
-                        all_labels.append(label)
-                        all_vals_a.append(v["gflops"])
+                        pairs_a.setdefault(label, []).append(v["gflops"])
 
     for r in results_b:
         if not r.get("success"):
@@ -1180,7 +1179,18 @@ def _render_comparison_html(
             if isinstance(kernel_data, dict):
                 for v in kernel_data.values():
                     if isinstance(v, dict) and "gflops" in v:
-                        all_vals_b.append(v["gflops"])
+                        pairs_b.setdefault(label, []).append(v["gflops"])
+
+    all_labels = []
+    all_vals_a = []
+    all_vals_b = []
+    common = sorted(set(pairs_a) & set(pairs_b))
+    for label in common:
+        for i, va in enumerate(pairs_a[label]):
+            if i < len(pairs_b[label]):
+                all_labels.append(label)
+                all_vals_a.append(va)
+                all_vals_b.append(pairs_b[label][i])
 
     chart_html = ""
     if all_labels and all_vals_a and all_vals_b:

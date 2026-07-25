@@ -64,6 +64,18 @@ class SlurmManager:
 
             benchmark = bench_cls(bench_cfg.params)
 
+            if not benchmark.uses_precision_batch:
+                for gpu in gpus:
+                    gpu_index = gpu["index"]
+                    script_content = benchmark.build_slurm_script(gpu_index, "fp32", 1)
+                    header = self._build_header(bench_cfg.name, gpu_index, "fp32", 1)
+                    full_script = header + "\n" + script_content
+                    script_name = f"{bench_cfg.name}_gpu{gpu_index}_fp32_bs1.sh"
+                    script_path = self.scripts_dir / script_name
+                    script_path.write_text(full_script, encoding="utf-8")
+                    scripts.append(script_path)
+                continue
+
             for precision in self.config.precisions:
                 for batch_size in self.config.batch_sizes:
                     for gpu in gpus:

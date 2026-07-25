@@ -57,7 +57,7 @@ class RunConfig:
     slurm: SlurmConfig = field(default_factory=SlurmConfig)
     benchmarks: list[BenchmarkConfig] = field(default_factory=list)
     precisions: list[str] = field(default_factory=lambda: ["fp32", "fp16", "int8"])
-    batch_sizes: list[int] = field(default_factory=lambda: [1, 32, 64, 128])
+    batch_sizes: list[int] = field(default_factory=lambda: [1, 32, 64, 128, 256])
     environment: dict[str, Any] = field(default_factory=dict)
 
 
