@@ -298,7 +298,7 @@ def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
             gpu["clock_mem_mhz"] = _parse_int_or_none(parts[1])
             gpu["power_limit_w"] = _parse_int_or_none(parts[2])
             gpu["power_draw_w"] = _parse_int_or_none(parts[3])
-            gpu["ecc_mode"] = parts[4].strip()
+            gpu["ecc_mode"] = parts[4].strip().strip("[]")
             gpu["ecc_errors_corrected"] = _parse_int_or_none(parts[5])
             gpu["ecc_errors_uncorrected"] = _parse_int_or_none(parts[6])
             gpu["pcie_gen"] = _parse_int_or_none(parts[7])
@@ -311,7 +311,7 @@ def _parse_int_or_none(value: str) -> int | None:
         v = value.strip()
         if v in ("", "N/A", "Unknown", "Not Supported"):
             return None
-        return int(v)
+        return int(float(v))
     except (ValueError, TypeError):
         return None
 
