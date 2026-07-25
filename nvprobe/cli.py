@@ -22,8 +22,9 @@ console = Console()
 @app.command()
 def run(
     config: Path = typer.Option(
-        ..., "--config", "-c", help="YAML config file defining the test matrix.",
-        exists=True, dir_okay=False, readable=True,
+        Path("nvprobe/configs/local.yaml"), "--config", "-c",
+        help="YAML config file defining the test matrix.",
+        dir_okay=False, readable=True,
     ),
     output: Path = typer.Option(
         Path("nvprobe/results"), "--output", "-o", help="Directory for raw results (JSON/CSV).",
@@ -37,6 +38,11 @@ def run(
 ) -> None:
     """Run benchmarks defined in a config file."""
     from nvprobe.runner import run_benchmarks
+
+    if not config.exists():
+        console.print(f"[red]Config file not found:[/red] {config}")
+        console.print("Run [bold]nvprobe init[/bold] to generate default configs, or specify a custom config with --config.")
+        raise typer.Exit(1)
 
     console.print(f"[bold green]nvprobe v{__version__}[/bold green]")
     console.print(f"Config:  {config}")
