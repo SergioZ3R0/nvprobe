@@ -55,7 +55,7 @@ def _get_available_host_memory() -> int | None:
                             with open(mem_max) as mf:
                                 val = mf.read().strip()
                                 if val and val != "max":
-                                    return int(val) * 1024  # memory.max is in bytes
+                                    return int(val)  # memory.max is in bytes
     except Exception:
         pass
     try:
