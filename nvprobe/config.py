@@ -66,7 +66,9 @@ def load_config(path: Path) -> RunConfig:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if raw is None:
         raise ValueError(f"Config file is empty: {path}")
-    return _parse_config(raw)
+    cfg = _parse_config(raw)
+    cfg._source_path = path.resolve()  # type: ignore[attr-defined]
+    return cfg
 
 
 def _parse_config(raw: dict[str, Any]) -> RunConfig:

@@ -1,38 +1,38 @@
-"""Slurm integration — job submission, monitoring, and result collection."""
+"""Slurm integration — per-node job submission, monitoring, and result collection.
+
+Each compute node runs nvprobe locally, creating its own database.
+After all jobs complete, per-node databases are merged into a unified one,
+making the Slurm workflow identical to the local workflow for reporting.
+"""
 
 from __future__ import annotations
 
+import copy
 import json
+import shutil
+import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
-from nvprobe.benchmarks import BENCHMARK_REGISTRY
 from nvprobe.config import RunConfig
 
 
 @dataclass
 class SlurmJob:
-    """Represents a submitted Slurm job."""
+    """Represents a submitted Slurm node job."""
 
     job_id: str
-    benchmark: str
-    gpu_index: int
-    precision: str
-    batch_size: int
+    node_index: int
     script_path: str
     output_path: str | None = None
     status: str = "pending"
 
 
 class SlurmManager:
-    """Manages Slurm job lifecycle: generate, submit, monitor, collect.
-
-    Job state is persisted to a JSON file so submit/monitor/collect
-    work across separate CLI invocations.
-    """
+    """Manages Slurm job lifecycle: generate, submit, monitor, collect, merge."""
 
     def __init__(self, config: RunConfig, output_dir: Path) -> None:
         self.config = config
@@ -47,55 +47,42 @@ class SlurmManager:
     # --- Public API ---
 
     def generate_scripts(self) -> list[Path]:
-        """Generate sbatch scripts for all enabled benchmarks x configs."""
-        env_info = _detect_environment()
-        gpus = env_info.get("gpus", [])
-        if not gpus:
-            print("WARNING: no GPUs detected, generating scripts for GPU 0 only")
-            gpus = [{"index": 0}]
+        """Generate one sbatch script per node.
+
+        Each script runs ``nvprobe run --local`` on its allocated node,
+        writing results to a per-node subdirectory.
+        """
+        slurm = self.config.slurm
+        num_nodes = max(1, slurm.nodes)
+        gpus_per_node = max(1, slurm.gpus_per_node)
+
+        # Copy config to output dir so compute nodes can access it
+        config_src = getattr(self.config, "_source_path", None)
+        if config_src is None:
+            raise RuntimeError(
+                "Slurm config must be loaded from a YAML file via load_config()"
+            )
+        config_src = Path(config_src)
+        config_dst = self.output_dir / "cluster_config.yaml"
+        shutil.copy2(config_src, config_dst)
 
         scripts: list[Path] = []
-        for bench_cfg in self.config.benchmarks:
-            if not bench_cfg.enabled:
-                continue
-            bench_cls = BENCHMARK_REGISTRY.get(bench_cfg.name)
-            if bench_cls is None:
-                continue
+        for node_idx in range(num_nodes):
+            header = self._build_header(node_idx, gpus_per_node)
+            body = self._build_body(node_idx, config_dst)
+            full_script = header + "\n" + body
 
-            benchmark = bench_cls(bench_cfg.params)
+            script_path = self.scripts_dir / f"nvprobe_node_{node_idx}.sh"
+            script_path.write_text(full_script, encoding="utf-8")
+            scripts.append(script_path)
 
-            if not benchmark.uses_precision_batch:
-                for gpu in gpus:
-                    gpu_index = gpu["index"]
-                    script_content = benchmark.build_slurm_script(gpu_index, "fp32", 1)
-                    header = self._build_header(bench_cfg.name, gpu_index, "fp32", 1)
-                    full_script = header + "\n" + script_content
-                    script_name = f"{bench_cfg.name}_gpu{gpu_index}_fp32_bs1.sh"
-                    script_path = self.scripts_dir / script_name
-                    script_path.write_text(full_script, encoding="utf-8")
-                    scripts.append(script_path)
-                continue
-
-            for precision in self.config.precisions:
-                for batch_size in self.config.batch_sizes:
-                    for gpu in gpus:
-                        gpu_index = gpu["index"]
-                        script_content = benchmark.build_slurm_script(gpu_index, precision, batch_size)
-                        header = self._build_header(bench_cfg.name, gpu_index, precision, batch_size)
-                        full_script = header + "\n" + script_content
-
-                        script_name = f"{bench_cfg.name}_gpu{gpu_index}_{precision}_bs{batch_size}.sh"
-                        script_path = self.scripts_dir / script_name
-                        script_path.write_text(full_script, encoding="utf-8")
-                        scripts.append(script_path)
-
-        print(f"Generated {len(scripts)} Slurm scripts in {self.scripts_dir}")
+        print(f"Generated {len(scripts)} node script(s) in {self.scripts_dir}")
         return scripts
 
     def submit_all(self, scripts: list[Path] | None = None) -> list[SlurmJob]:
         """Submit all generated scripts (or provided list) to Slurm."""
         if scripts is None:
-            scripts = list(self.scripts_dir.glob("*.sh"))
+            scripts = sorted(self.scripts_dir.glob("nvprobe_node_*.sh"))
 
         for script in scripts:
             job = self._submit_script(script)
@@ -103,7 +90,7 @@ class SlurmManager:
                 self._jobs.append(job)
 
         self._save_jobs()
-        print(f"Submitted {len(self._jobs)} jobs")
+        print(f"Submitted {len(self._jobs)} job(s)")
         return self._jobs
 
     def monitor(self, poll_interval: int = 30) -> None:
@@ -112,7 +99,7 @@ class SlurmManager:
             print("No jobs to monitor.")
             return
 
-        print(f"Monitoring {len(self._jobs)} jobs (poll every {poll_interval}s)...")
+        print(f"Monitoring {len(self._jobs)} job(s) (poll every {poll_interval}s)...")
         while True:
             running = self._get_running_jobs()
             completed = len(self._jobs) - len(running)
@@ -128,25 +115,17 @@ class SlurmManager:
         self._save_jobs()
 
     def collect_results(self) -> dict[str, Any]:
-        """Collect output from completed jobs."""
-        results: dict[str, Any] = {}
-
-        for job in self._jobs:
-            out_path = Path(job.output_path) if job.output_path else None
-            if out_path and out_path.exists():
-                output = out_path.read_text(encoding="utf-8")
-                key = f"{job.benchmark}_gpu{job.gpu_index}_{job.precision}_bs{job.batch_size}"
-                results[key] = {
-                    "job_id": job.job_id,
-                    "benchmark": job.benchmark,
-                    "gpu_index": job.gpu_index,
-                    "precision": job.precision,
-                    "batch_size": job.batch_size,
-                    "output": output,
-                    "status": job.status,
-                }
-
-        return results
+        """Collect results from completed jobs and merge databases."""
+        merged_db_path = self.output_dir / "benchmarks.db"
+        env_info = merge_databases(
+            self.output_dir, merged_db_path, self.config.name,
+            self.config.description,
+        )
+        return {
+            "merged_db": str(merged_db_path),
+            "gpus": len(env_info.get("gpus", [])),
+            "nodes": len(self._jobs),
+        }
 
     # --- Job persistence ---
 
@@ -167,10 +146,10 @@ class SlurmManager:
 
     # --- Internal helpers ---
 
-    def _build_header(self, benchmark: str, gpu_index: int, precision: str, batch_size: int) -> str:
-        """Build Slurm SBATCH header from config."""
+    def _build_header(self, node_idx: int, gpus_per_node: int) -> str:
+        """Build Slurm SBATCH header for a single-node job."""
         slurm = self.config.slurm
-        job_name = f"nvprobe-{benchmark}-gpu{gpu_index}-{precision}-bs{batch_size}"
+        job_name = f"nvprobe-n{node_idx}"
         output_file = str(self.jobs_dir / f"{job_name}_%j.out").replace("\\", "/")
         error_file = str(self.jobs_dir / f"{job_name}_%j.err").replace("\\", "/")
 
@@ -180,9 +159,9 @@ class SlurmManager:
             f"#SBATCH --output={output_file}",
             f"#SBATCH --error={error_file}",
             f"#SBATCH --partition={slurm.partition}",
-            f"#SBATCH --nodes={slurm.nodes}",
-            f"#SBATCH --ntasks=1",
-            f"#SBATCH --gpus={slurm.gpus_per_node}",
+            "#SBATCH --nodes=1",
+            "#SBATCH --ntasks=1",
+            f"#SBATCH --gpus={gpus_per_node}",
             f"#SBATCH --time={slurm.time_limit}",
         ]
 
@@ -198,7 +177,7 @@ class SlurmManager:
             "module purge 2>/dev/null || true",
             "module load cuda 2>/dev/null || true",
             "",
-            "echo \"=== nvProbe Slurm Job ===\"",
+            f"echo \"=== nvProbe Node {node_idx} ===\"",
             "echo \"Job ID: $SLURM_JOB_ID\"",
             "echo \"Node: $(hostname)\"",
             "echo \"GPUs: $SLURM_GPUS_ON_NODE\"",
@@ -208,6 +187,20 @@ class SlurmManager:
 
         return "\n".join(lines)
 
+    def _build_body(self, node_idx: int, config_path: Path) -> str:
+        """Build the body: run nvprobe locally on this node."""
+        node_output = self.output_dir / f"node_{node_idx}"
+        return f"""# Navigate to output directory and run
+cd {self.output_dir.resolve()}
+
+python3 -m nvprobe.cli run \\
+    --config {config_path.resolve()} \\
+    --local \\
+    --output {node_output.resolve()}
+
+echo "nvprobe completed on $(hostname)"
+"""
+
     def _submit_script(self, script_path: Path) -> SlurmJob | None:
         """Submit a single sbatch script and return SlurmJob."""
         try:
@@ -216,17 +209,17 @@ class SlurmManager:
                 capture_output=True, text=True, check=True,
             )
             job_id = proc.stdout.strip().split()[-1]
-            parts = script_path.stem.split("_")
-            job_name = f"nvprobe-{parts[0]}-gpu{parts[1].replace('gpu', '')}-{parts[2]}-bs{parts[3].replace('bs', '')}"
-            script_path_str = str(script_path)
+
+            # Parse node index from filename: nvprobe_node_0.sh → 0
+            stem = script_path.stem
+            node_idx = int(stem.rsplit("_", 1)[-1])
+
+            job_name = f"nvprobe-n{node_idx}"
             output_path_str = str(self.jobs_dir / f"{job_name}_{job_id}.out")
             return SlurmJob(
                 job_id=job_id,
-                benchmark=parts[0],
-                gpu_index=int(parts[1].replace("gpu", "")),
-                precision=parts[2],
-                batch_size=int(parts[3].replace("bs", "")),
-                script_path=script_path_str,
+                node_index=node_idx,
+                script_path=str(script_path),
                 output_path=output_path_str,
             )
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
@@ -260,18 +253,173 @@ class SlurmManager:
                 job.status = "unknown"
 
 
-def _detect_environment() -> dict[str, Any]:
-    """Quick GPU detection for Slurm script generation."""
-    info: dict[str, Any] = {"gpus": []}
-    try:
-        proc = subprocess.run(
-            ["nvidia-smi", "--query-gpu=index,name", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, check=True,
+def merge_databases(
+    output_dir: Path,
+    merged_db_path: Path,
+    run_name: str = "slurm-run",
+    run_description: str = "",
+) -> dict[str, Any]:
+    """Merge per-node databases into a single unified database.
+
+    Returns the merged environment fingerprint.
+    """
+    # Find all node databases
+    node_dirs = sorted(output_dir.glob("node_*"))
+    node_db_paths = [d / "benchmarks.db" for d in node_dirs if (d / "benchmarks.db").exists()]
+    node_env_paths = [d / "environment.json" for d in node_dirs if (d / "environment.json").exists()]
+
+    if not node_db_paths:
+        print("WARNING: no node databases found to merge")
+        return {"gpus": []}
+
+    # Build merged environment from all node fingerprints
+    merged_env = _merge_environments(node_env_paths)
+
+    # Create merged database
+    merged_db = sqlite3.connect(str(merged_db_path))
+    _init_merged_db(merged_db)
+    run_id = _create_merged_run(merged_db, run_name, run_description, merged_env)
+
+    # Copy results from each node with re-indexed GPU indices
+    gpu_offset = 0
+    for db_path in node_db_paths:
+        node_dir = db_path.parent
+        env_path = node_dir / "environment.json"
+        gpu_count = _count_gpus_in_env(env_path)
+        node_db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+
+        rows = node_db.execute(
+            "SELECT * FROM results ORDER BY benchmark, gpu_index, precision"
+        ).fetchall()
+
+        for row in rows:
+            rd = dict(row)
+            new_gpu = rd["gpu_index"] + gpu_offset
+            identity = _make_identity(
+                rd["benchmark"], new_gpu, rd["precision"], rd["batch_size"],
+            )
+            merged_db.execute(
+                """INSERT OR IGNORE INTO results
+                   (run_id, identity, benchmark, gpu_model, gpu_index,
+                    precision, batch_size, metrics, raw_output,
+                    success, error, elapsed_sec, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id, identity, rd["benchmark"], rd["gpu_model"],
+                    new_gpu, rd["precision"], rd["batch_size"],
+                    rd["metrics"], rd["raw_output"], rd["success"],
+                    rd["error"], rd["elapsed_sec"], rd["created_at"],
+                ),
+            )
+
+        node_db.close()
+        gpu_offset += gpu_count
+
+    merged_db.commit()
+    merged_db.close()
+
+    print(f"Merged {len(node_db_paths)} node database(s) → {merged_db_path}")
+    print(f"  Total GPUs: {len(merged_env.get('gpus', []))}")
+    return merged_env
+
+
+def _merge_environments(env_paths: list[Path]) -> dict[str, Any]:
+    """Merge environment JSON files from multiple nodes.
+
+    Concatenates GPU lists with hostname-prefixed model names and re-indexed indices.
+    """
+    merged: dict[str, Any] = {
+        "timestamp": "",
+        "hostname": "merged",
+        "kernel": "",
+        "driver_version": "",
+        "cuda_version": "",
+        "gpus": [],
+    }
+
+    global_idx = 0
+    for path in env_paths:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        host = data.get("hostname", "unknown")
+        if not merged["driver_version"]:
+            merged["driver_version"] = data.get("driver_version", "")
+        if not merged["cuda_version"]:
+            merged["cuda_version"] = data.get("cuda_version", "")
+        if not merged["kernel"]:
+            merged["kernel"] = data.get("kernel", "")
+        if not merged["timestamp"]:
+            merged["timestamp"] = data.get("timestamp", "")
+
+        for gpu in data.get("gpus", []):
+            gpu_copy = copy.deepcopy(gpu)
+            gpu_copy["model"] = f"{gpu_copy.get('model', 'unknown')} ({host})"
+            gpu_copy["index"] = global_idx
+            merged["gpus"].append(gpu_copy)
+            global_idx += 1
+
+    return merged
+
+
+def _init_merged_db(db: sqlite3.Connection) -> None:
+    """Create tables in merged database if they don't exist."""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            environment TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL
         )
-        for line in proc.stdout.strip().splitlines():
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) >= 2:
-                info["gpus"].append({"index": int(parts[0]), "model": parts[1]})
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-    return info
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL,
+            identity TEXT UNIQUE,
+            benchmark TEXT NOT NULL,
+            gpu_model TEXT NOT NULL,
+            gpu_index INTEGER NOT NULL,
+            precision TEXT DEFAULT '',
+            batch_size INTEGER DEFAULT 1,
+            metrics TEXT DEFAULT '{}',
+            raw_output TEXT DEFAULT '',
+            success INTEGER DEFAULT 1,
+            error TEXT DEFAULT '',
+            elapsed_sec REAL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES runs(id)
+        )
+    """)
+    db.commit()
+
+
+def _create_merged_run(
+    db: sqlite3.Connection, name: str, description: str, env: dict[str, Any],
+) -> int:
+    """Insert a run entry into the merged database."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    cur = db.execute(
+        "INSERT INTO runs (name, description, environment, created_at) VALUES (?, ?, ?, ?)",
+        (name, description, json.dumps(env, default=str), now),
+    )
+    db.commit()
+    return cur.lastrowid or 0
+
+
+def _count_gpus_in_env(env_path: Path) -> int:
+    """Return the number of GPUs reported in an environment JSON file."""
+    try:
+        data = json.loads(env_path.read_text(encoding="utf-8"))
+        return len(data.get("gpus", []))
+    except (json.JSONDecodeError, OSError):
+        return 0
+
+
+def _make_identity(benchmark: str, gpu_index: int, precision: str, batch_size: int) -> str:
+    """Build a unique identity string for deduplication."""
+    return f"{benchmark}:{gpu_index}:{precision}:{batch_size}"
