@@ -41,6 +41,12 @@ benchmarks:
     params:
       sizes_mb: [4096, 16384]
 
+  - name: burn
+    enabled: true
+    params:
+      duration_sec: 60
+      matrix_size: 16384
+
   - name: custom
     enabled: true
     params:

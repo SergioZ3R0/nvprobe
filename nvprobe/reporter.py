@@ -736,6 +736,128 @@ def _chart_memtest(results: list[dict[str, Any]]) -> str:
 </script>"""
 
 
+def _chart_burn(results: list[dict[str, Any]]) -> str:
+    """Burn test time-series chart: SM/MEM clocks and temperature over time."""
+    all_times: list[float] = []
+    all_sm: list[int | None] = []
+    all_mem: list[int | None] = []
+    all_temp: list[int | None] = []
+
+    for r in results:
+        if not r.get("success"):
+            continue
+        if r["benchmark"] != "burn":
+            continue
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        ts = metrics.get("time_series", [])
+        if not ts:
+            continue
+        all_times = [p["t"] for p in ts]
+        all_sm = [p["sm"] for p in ts]
+        all_mem = [p["mem"] for p in ts]
+        all_temp = [p["temp"] for p in ts]
+        break
+
+    if not all_times:
+        return ""
+
+    sm_label = f"GPU {results[0]['gpu_index']} SM Clock"
+    mem_label = f"GPU {results[0]['gpu_index']} Mem Clock"
+
+    return f"""<details class="chart" open>
+<summary>Burn — Sustained Clock Stability</summary>
+<div class="chart-inner">
+  <canvas id="ch-burn"></canvas>
+</div>
+</details>
+<script>
+(function() {{
+  var ctx = document.getElementById('ch-burn');
+  if (!ctx || !window.Chart) return;
+  new Chart(ctx.getContext('2d'), {{
+    type: 'line',
+    data: {{
+      labels: {json.dumps(all_times)},
+      datasets: [
+        {{
+          label: '{sm_label}',
+          data: {json.dumps(all_sm)},
+          borderColor: '{ACCENT}',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.1,
+          yAxisID: 'y',
+        }},
+        {{
+          label: '{mem_label}',
+          data: {json.dumps(all_mem)},
+          borderColor: '{ACCENT_WARN}',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.1,
+          yAxisID: 'y',
+        }},
+        {{
+          label: 'Temperature (°C)',
+          data: {json.dumps(all_temp)},
+          borderColor: '{ACCENT_FAIL}',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0.2,
+          yAxisID: 'y1',
+        }},
+      ]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.8,
+      interaction: {{
+        mode: 'index',
+        intersect: false,
+      }},
+      plugins: {{
+        legend: {{ labels: {{ color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}, boxWidth: 14, padding: 12 }} }},
+        tooltip: {{
+          backgroundColor: '#1A1D21',
+          titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+          bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+          borderColor: '{BORDER}',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 6,
+          titleColor: '{TEXT}',
+          bodyColor: '{TEXT}',
+        }},
+      }},
+      scales: {{
+        x: {{
+          title: {{display: true, text: 'Time (s)', color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}}},
+          grid: {{color: 'rgba(255,255,255,0.04)'}},
+          ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}},
+        }},
+        y: {{
+          title: {{display: true, text: 'Clock (MHz)', color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}}},
+          grid: {{color: 'rgba(255,255,255,0.04)'}},
+          ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}},
+        }},
+        y1: {{
+          position: 'right',
+          title: {{display: true, text: 'Temp (°C)', color: '{ACCENT_FAIL}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}}},
+          grid: {{display: false}},
+          ticks: {{color: '{ACCENT_FAIL}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}},
+        }},
+      }},
+    }}
+  }});
+}})();
+</script>"""
+
+
 def _chart_summary(results: list[dict[str, Any]]) -> str:
     """Summary dashboard: pass/fail per benchmark + avg performance."""
     bench_stats: dict[str, dict[str, Any]] = {}
@@ -874,6 +996,7 @@ def generate_report(
     for name, func in [
         ("summary", _chart_summary),
         ("bandwidth", _chart_bandwidth),
+        ("burn", _chart_burn),
         ("memtest", _chart_memtest),
         ("matmul", _chart_matmul),
         ("tiled_matmul", _chart_tiled_matmul),
@@ -972,6 +1095,7 @@ def _render_html(
     _CHART_NAMES = [
         ("summary", "Summary Dashboard"),
         ("bandwidth", "Memory Bandwidth"),
+        ("burn", "Burn — Clock Stability"),
         ("memtest", "Memtest — VRAM Integrity"),
         ("matmul", "Matrix Multiplication"),
         ("tiled_matmul", "Tiled MatMul (Shared Memory)"),
