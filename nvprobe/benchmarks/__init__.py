@@ -4,6 +4,7 @@ from nvprobe.benchmarks.bandwidth import BandwidthBenchmark
 from nvprobe.benchmarks.custom import CustomCudaBenchmark
 from nvprobe.benchmarks.hpl import HplBenchmark
 from nvprobe.benchmarks.hpcg import HpcgBenchmark
+from nvprobe.benchmarks.memtest import MemtestBenchmark
 from nvprobe.benchmarks.mlperf import MlperfBenchmark
 
 BENCHMARK_REGISTRY: dict[str, type] = {
@@ -11,6 +12,7 @@ BENCHMARK_REGISTRY: dict[str, type] = {
     "custom": CustomCudaBenchmark,
     "hpl": HplBenchmark,
     "hpcg": HpcgBenchmark,
+    "memtest": MemtestBenchmark,
     "mlperf": MlperfBenchmark,
 }
 
@@ -20,5 +22,6 @@ __all__ = [
     "CustomCudaBenchmark",
     "HplBenchmark",
     "HpcgBenchmark",
+    "MemtestBenchmark",
     "MlperfBenchmark",
 ]

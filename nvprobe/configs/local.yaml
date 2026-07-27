@@ -24,6 +24,11 @@ benchmarks:
       sizes_mb: [1, 4, 16, 64, 256]
       iterations: 50
 
+  - name: memtest
+    enabled: true
+    params:
+      sizes_mb: [1024]
+
   - name: custom
     enabled: true
     params:
