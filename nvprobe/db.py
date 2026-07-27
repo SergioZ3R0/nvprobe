@@ -323,7 +323,7 @@ def _parse_int_or_none(value: str) -> int | None:
 def _run_cmd_safe(cmd: list[str]) -> str:
     """Run a command safely, returning empty string on failure."""
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         return proc.stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""

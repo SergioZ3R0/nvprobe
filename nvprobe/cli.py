@@ -183,21 +183,23 @@ def _detect_mpi_variant() -> str:
     import os
     import shutil
     import subprocess
-    mpi_bin = shutil.which("mpirun")
-    if mpi_bin:
-        try:
-            out = subprocess.run(
-                [mpi_bin, "--version"], capture_output=True, text=True, timeout=5,
-            )
-            combined = (out.stdout + out.stderr).lower()
-            if "open mpi" in combined or "openmpi" in combined:
-                return "openmpi"
-        except Exception:
-            pass
+    for mpi_name in ("mpirun", "srun"):
+        mpi_bin = shutil.which(mpi_name)
+        if mpi_bin:
+            try:
+                out = subprocess.run(
+                    [mpi_bin, "--version"], capture_output=True, text=True, timeout=5,
+                )
+                combined = (out.stdout + out.stderr).lower()
+                if "open mpi" in combined or "openmpi" in combined:
+                    return "openmpi"
+            except Exception:
+                pass
     # Also check common env vars for hints
-    opal = os.environ.get("OPAL_PREFIX", "")
-    if "openmpi" in opal.lower():
-        return "openmpi"
+    for var in ("OPAL_PREFIX", "OMPI_COMM_WORLD_SIZE"):
+        val = os.environ.get(var, "")
+        if "openmpi" in val.lower() or (var == "OMPI_COMM_WORLD_SIZE" and val):
+            return "openmpi"
     return "mpich"
 
 
