@@ -651,6 +651,91 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
 {script}"""
 
 
+def _chart_memtest(results: list[dict[str, Any]]) -> str:
+    """Memtest bar chart: errors per pattern and bandwidth per pattern."""
+    data: list[dict[str, Any]] = []
+    seen = set()
+    for r in results:
+        if not r.get("success"):
+            continue
+        if r["benchmark"] != "memtest":
+            continue
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        gpu_label = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+        if gpu_label in seen:
+            continue
+        seen.add(gpu_label)
+
+        patterns = {k: v for k, v in metrics.items()
+                    if isinstance(v, dict) and "errors" in v}
+        for pattern_name, pat_data in sorted(patterns.items()):
+            data.append({
+                "label": f"{gpu_label} {pattern_name}",
+                "errors": pat_data.get("errors", 0),
+                "bandwidth_gbs": pat_data.get("bandwidth_gbs", 0),
+                "passed": pat_data.get("passed", True),
+            })
+
+    if not data:
+        return ""
+
+    labels_json = json.dumps([d["label"] for d in data])
+    errors_json = json.dumps([d["errors"] for d in data])
+    bw_json = json.dumps([d["bandwidth_gbs"] for d in data])
+
+    return f"""<details class="chart" open>
+<summary>Memtest — VRAM Integrity</summary>
+<div class="chart-inner">
+  <canvas id="ch-memtest"></canvas>
+</div>
+</details>
+<script>
+(function() {{
+  var ctx = document.getElementById('ch-memtest');
+  if (!ctx || !window.Chart) return;
+  new Chart(ctx.getContext('2d'), {{
+    type: 'bar',
+    data: {{
+      labels: {labels_json},
+      datasets: [
+        {{
+          label: 'Errors',
+          data: {errors_json},
+          backgroundColor: '{ACCENT_FAIL}99',
+          borderColor: '{ACCENT_FAIL}',
+          borderWidth: 1,
+          borderRadius: 2,
+        }},
+      ]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.8,
+      plugins: {{
+        legend: {{ display: false }},
+        tooltip: {{
+          backgroundColor: '#1A1D21',
+          titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+          bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+          borderColor: '{BORDER}',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 6,
+          titleColor: '{TEXT}',
+          bodyColor: '{TEXT}',
+        }},
+      }},
+      scales: {{
+        x: {{ grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 9}}, maxRotation: 45}} }},
+        y: {{ beginAtZero: true, title: {{display: true, text: 'Errors', color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}}}, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+      }},
+    }}
+  }});
+}})();
+</script>"""
+
+
 def _chart_summary(results: list[dict[str, Any]]) -> str:
     """Summary dashboard: pass/fail per benchmark + avg performance."""
     bench_stats: dict[str, dict[str, Any]] = {}
@@ -789,6 +874,7 @@ def generate_report(
     for name, func in [
         ("summary", _chart_summary),
         ("bandwidth", _chart_bandwidth),
+        ("memtest", _chart_memtest),
         ("matmul", _chart_matmul),
         ("tiled_matmul", _chart_tiled_matmul),
         ("attention", _chart_attention),
