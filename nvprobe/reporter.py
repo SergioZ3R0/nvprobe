@@ -869,9 +869,11 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
         if r.get("success"):
             bench_stats[name]["passed"] += 1
             metrics = _parse_metrics(r.get("metrics", "{}"))
-            gflops = metrics.get("gflops") or metrics.get("tflops")
-            if gflops:
+            gflops = metrics.get("gflops")
+            if gflops is not None:
                 bench_stats[name]["gflops"].append(float(gflops))
+            elif metrics.get("tflops") is not None:
+                bench_stats[name]["gflops"].append(float(metrics["tflops"]) * 1000)
 
     if not bench_stats:
         return ""

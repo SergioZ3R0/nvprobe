@@ -373,14 +373,16 @@
             </div>
             <h1>nv<span>probe</span></h1>
             <p>
-                Automate CUDA workloads, run HPL &amp; HPCG, profile custom kernels,
-                benchmark MLPerf inference, compare hardware, and generate interactive
-                HTML reports — all from a single CLI.
+                Baseline GPUs at delivery, run HPL &amp; HPCG, test VRAM integrity,
+                detect thermal throttling, benchmark MLPerf inference, and generate
+                interactive HTML reports — all from a single CLI.
             </p>
             <div class="badge-wrap">
                 <span class="badge badge-py">Python 3.10+</span>
                 <span class="badge badge-cuda">CUDA 12 / 13</span>
                 <span class="badge badge-hpc">HPL / HPCG</span>
+                <span class="badge badge-hpc">Memtest</span>
+                <span class="badge badge-ml">Burn</span>
                 <span class="badge badge-ml">MLPerf</span>
             </div>
             <div class="hero-terminal" aria-label="Live terminal output from nvprobe" id="hero-terminal">
@@ -412,6 +414,11 @@
                     </article>
                     <article class="feature">
                         <div class="icon" role="img" aria-label="chart with upwards trend icon">📈</div>
+                        <h3>Infrastructure Audits</h3>
+                        <p>Capture max clocks, power caps, ECC state, PCIe link speed &amp; NVLink — baseline today, re-run in 6 months, spot degradation instantly.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="graph icon">📊</div>
                         <h3>Interactive Charts</h3>
                         <p>Chart.js canvas-based charts with tooltip hover, zoom, and oscilloscope-style glow.</p>
                     </article>

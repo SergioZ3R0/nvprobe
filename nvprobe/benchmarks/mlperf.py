@@ -468,6 +468,15 @@ class MlperfBenchmark(BaseBenchmark):
 
 pip install --user loguru 2>/dev/null || true
 
+# Register pip-installed cuDNN so mlcr sub-scripts find it at runtime
+CUDNN_ROOT=$(python3 -c "from nvprobe.benchmarks.base import _find_cudnn_root; print(_find_cudnn_root() or '')" 2>/dev/null)
+if [ -n "$CUDNN_ROOT" ]; then
+    export CUDNN_ROOT
+    export MLC_CUDA_PATH_LIB_CUDNN="$CUDNN_ROOT/lib"
+    export MLC_CUDA_PATH_INCLUDE_CUDNN="$CUDNN_ROOT/include"
+    export LD_LIBRARY_PATH="$CUDNN_ROOT/lib:$LD_LIBRARY_PATH"
+fi
+
 {mlperf_line}
     --model={model} \\
     --implementation={implementation} \\
