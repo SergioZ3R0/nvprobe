@@ -33,10 +33,15 @@ pip install nvprobe && nvprobe setup && nvprobe run --local
 | H2D / D2H / D2D across buffer sizes | fp32, fp16, int8 custom CUDA kernels | 2D convolution benchmarks |
 | **HPL** (FP64 Linpack) | **HPCG** | **MLPerf Inference** |
 | Datacenter GPUs: A100, H100, B200, L40S… | Conjugate Gradients | ONNX Runtime via cmx4mlperf |
+| **Memtest** | **Burn** | |
+| VRAM integrity: solid, checkerboard, random, walking-1 patterns | Sustained clock stability, thermal/power throttling detection | |
 
 - **Bundled CUDA runtime** &mdash; CuPy `[ctk]` via pip, no system toolkit required
 - **Auto-downloaded HPC tools** &mdash; NVIDIA HPC Benchmarks cached in `~/.nvprobe/tools/`
 - **Interactive HTML reports** &mdash; Chart.js charts with GPU / transfer / precision dropdowns and oscilloscope-style glow
+- **GPU diagnostics** &mdash; max clocks, power limits, ECC state, PCIe link speed, NVLink active links captured per run
+- **Memory integrity** &mdash; memtest with solid, checkerboard, random, and walking-1 patterns to detect VRAM faults
+- **Thermal soak** &mdash; sustained burn test with time-series clock/temp/power tracking and throttling detection
 - **A/B comparison** &mdash; compare two result sets side-by-side
 - **Slurm integration** &mdash; generate, submit, monitor, collect from HPC clusters
 - **SQLite storage** &mdash; all results persisted; CSV / JSON export
@@ -73,6 +78,8 @@ Chart.js canvas-based charts with interactive controls:
 
 - **Bandwidth** &mdash; filter by GPU and transfer type (H2D / D2H / D2D)
 - **MatMul / Attention** &mdash; filter by GPU and precision (fp32 / fp16)
+- **Burn** &mdash; time-series line chart of SM/MEM clocks and temperature over sustained load
+- **Memtest** &mdash; bar chart of detected VRAM errors per test pattern
 - **Range slider** &mdash; zoom into any x-axis region
 - **Moving average** &mdash; smoother trend lines for dense data
 
@@ -110,9 +117,11 @@ nvprobe/
 │   └── benchmarks/
 │       ├── base.py                # Base class, GPU detection, diagnostics
 │       ├── bandwidth.py           # Memory bandwidth tests
+│       ├── burn.py                # Sustained burn / throttling detection
 │       ├── custom.py              # Custom CUDA kernels
 │       ├── hpl.py                 # HPL wrapper
 │       ├── hpcg.py                # HPCG wrapper
+│       ├── memtest.py             # VRAM integrity test
 │       ├── mlperf.py              # MLPerf via cmx4mlperf
 │       └── _cuda/                 # Raw CUDA kernels
 ├── configs/
