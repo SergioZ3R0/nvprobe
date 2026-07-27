@@ -972,6 +972,7 @@ def _render_html(
     _CHART_NAMES = [
         ("summary", "Summary Dashboard"),
         ("bandwidth", "Memory Bandwidth"),
+        ("memtest", "Memtest — VRAM Integrity"),
         ("matmul", "Matrix Multiplication"),
         ("tiled_matmul", "Tiled MatMul (Shared Memory)"),
         ("attention", "Scaled Dot-Product Attention"),
