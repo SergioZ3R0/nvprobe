@@ -126,12 +126,9 @@ def _run_hpl_size(
                 error=(
                     "xhpl crashed with a segmentation fault during GPU initialization, "
                     "before producing any output.\n"
-                    "This is a known compatibility issue between the NVIDIA HPC "
-                    "Benchmarks binaries and some workstation/professional GPUs "
-                    "(e.g. RTX Axxx series) outside their officially validated GPU "
-                    "list (A100/H100/etc.).\n"
-                    "This is not fixable from nvprobe. "
-                    "See README.md 'Known Limitations'."
+                    "Try 'nvprobe setup-tools --force' to get the latest binaries, "
+                    "and ensure you are using OpenMPI >= 5.x "
+                    "(OpenMPI 4.x may segfault on Blackwell GPUs)."
                 ),
             )
 

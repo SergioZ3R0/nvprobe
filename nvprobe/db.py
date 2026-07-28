@@ -304,15 +304,16 @@ def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
             gpu["pcie_gen"] = _parse_int_or_none(parts[7])
             gpu["pcie_width"] = _parse_int_or_none(parts[8])
 
-        nv_rows = _nvidia_smi_query("nvlink.active.links", gpu_index=idx)
-        if nv_rows:
-            gpu["nvlink_active_links"] = _parse_int_or_none(nv_rows[0])
+        nv_link = _query_nvlink_active(gpu_index=idx)
+        if nv_link is None:
+            nv_link = _query_nvlink_status(gpu_index=idx)
+        gpu["nvlink_active_links"] = nv_link
 
 
 def _parse_int_or_none(value: str) -> int | None:
     """Parse an integer from nvidia-smi output, returning None on failure."""
     try:
-        v = value.strip()
+        v = value.strip().strip("[]")
         if v in ("", "N/A", "Unknown", "Not Supported"):
             return None
         return int(float(v))
@@ -327,3 +328,27 @@ def _run_cmd_safe(cmd: list[str]) -> str:
         return proc.stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
+
+
+def _query_nvlink_active(gpu_index: int) -> int | None:
+    """Query nvlink.active.links field."""
+    rows = _nvidia_smi_query("nvlink.active.links", gpu_index=gpu_index)
+    if rows:
+        return _parse_int_or_none(rows[0])
+    return None
+
+
+def _query_nvlink_status(gpu_index: int) -> int | None:
+    """Fallback: parse nvidia-smi nvlink -s for NVSwitch/B200 systems."""
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "nvlink", "-s", "-i", str(gpu_index)],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        active = 0
+        for line in proc.stdout.splitlines():
+            if re.match(r"\s*Link \d+:", line) and "<inactive>" not in line:
+                active += 1
+        return active if active > 0 else None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
