@@ -74,6 +74,14 @@
             border-top: 1px solid var(--border); font-size: 0.75rem; color: var(--muted);
         }
         .sidebar-footer a { color: var(--accent); text-decoration: none; }
+        .theme-btn {
+            display: block; margin-top: 10px; background: none;
+            border: 1px solid var(--border); color: var(--muted);
+            cursor: pointer; font-size: 0.85rem; padding: 4px 10px;
+            border-radius: 6px; font-family: var(--font-mono);
+            transition: border-color .2s;
+        }
+        .theme-btn:hover { border-color: var(--accent); color: var(--text); }
 
         /* Main content */
         .content {
@@ -165,6 +173,7 @@
     <div class="sidebar-footer">
         <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a><br>
         <a href="https://github.com/SergioZ3R0/nvprobe">GitHub</a>
+        <button class="theme-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">&#9790;</button>
     </div>
 </nav>
 
@@ -480,6 +489,21 @@ the benchmark results. The HTML report shows these fields in the Environment tab
     }
     window.addEventListener('scroll', setActive);
     setActive();
+
+    var toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+        var html = document.documentElement;
+        function setTheme(t) {
+            html.setAttribute('data-theme', t);
+            localStorage.setItem('nvprobe-theme', t);
+        }
+        var saved = localStorage.getItem('nvprobe-theme');
+        if (saved) setTheme(saved);
+        toggle.addEventListener('click', function() {
+            var cur = html.getAttribute('data-theme') || 'dark';
+            setTheme(cur === 'dark' ? 'light' : 'dark');
+        });
+    }
 })();
 </script>
 
