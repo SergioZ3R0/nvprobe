@@ -80,8 +80,9 @@
             margin-left: var(--sidebar-w);
             flex: 1; padding: 48px 56px; max-width: 900px;
         }
-        .content h1 { font-family: var(--font-mono); font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
-        .content h1 span { color: var(--text); }
+        .content h1 { font-family: var(--font-mono); font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+        .content h1 span.nv { color: var(--text); }
+        .content h1 span.pr { color: var(--accent); }
         .content .intro { color: var(--muted); font-size: 1rem; margin-bottom: 40px; max-width: 640px; }
         .content h2 {
             font-family: var(--font-mono); font-size: 1.3rem; color: var(--accent);
@@ -169,7 +170,7 @@
 
 <main class="content">
 
-<h1 id="intro">nv<span>probe</span> Documentation</h1>
+<h1 id="intro"><span class="nv">nv</span><span class="pr">probe</span> Documentation</h1>
 <p class="intro">
     nvprobe runs its own optimized CUDA workloads via CuPy and cuBLAS — no external model files,
     no PyTorch/TensorFlow wrappers. Every benchmark is self-contained.
