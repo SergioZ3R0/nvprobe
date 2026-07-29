@@ -22,19 +22,6 @@
             --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
             --sidebar-w: 260px;
         }
-        [data-theme="light"] {
-            --bg: #D1D5DB;
-            --surface: #FFFFFF;
-            --text: #1A1D21;
-            --muted: #5A6270;
-            --border: rgba(0,0,0,0.08);
-        }
-        [data-theme="light"] .content pre, [data-theme="light"] .content pre code,
-        [data-theme="light"] .content table { background: #14181B; color: #E8ECEF; border-color: rgba(255,255,255,0.08); }
-        [data-theme="light"] .content pre code { border: none; }
-        [data-theme="light"] .content th { background: #14181B; color: var(--accent); border-color: rgba(255,255,255,0.08); }
-        [data-theme="light"] .content td { border-color: rgba(255,255,255,0.08); color: #E8ECEF; }
-        [data-theme="light"] .content code { background: #14181B; color: var(--accent); border-color: rgba(255,255,255,0.08); }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: var(--font-sans);
@@ -82,14 +69,6 @@
             border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.75rem; color: #7C8791;
         }
         .sidebar-footer a { color: var(--accent); text-decoration: none; }
-        .theme-btn {
-            display: block; margin-top: 10px; background: none;
-            border: 1px solid rgba(255,255,255,0.08); color: #7C8791;
-            cursor: pointer; font-size: 0.85rem; padding: 4px 10px;
-            border-radius: 6px; font-family: var(--font-mono);
-            transition: border-color .2s;
-        }
-        .theme-btn:hover { border-color: var(--accent); color: var(--text); }
 
         /* Main content */
         .content {
@@ -181,7 +160,6 @@
     <div class="sidebar-footer">
         <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a><br>
         <a href="https://github.com/SergioZ3R0/nvprobe">GitHub</a>
-        <button class="theme-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">&#9790;</button>
     </div>
 </nav>
 
@@ -497,21 +475,6 @@ the benchmark results. The HTML report shows these fields in the Environment tab
     }
     window.addEventListener('scroll', setActive);
     setActive();
-
-    var toggle = document.getElementById('theme-toggle');
-    if (toggle) {
-        var html = document.documentElement;
-        function setTheme(t) {
-            html.setAttribute('data-theme', t);
-            localStorage.setItem('nvprobe-theme', t);
-        }
-        var saved = localStorage.getItem('nvprobe-theme');
-        if (saved) setTheme(saved);
-        toggle.addEventListener('click', function() {
-            var cur = html.getAttribute('data-theme') || 'dark';
-            setTheme(cur === 'dark' ? 'light' : 'dark');
-        });
-    }
 })();
 </script>
 
