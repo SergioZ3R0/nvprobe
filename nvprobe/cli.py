@@ -15,6 +15,7 @@ app = typer.Typer(
     name="nvprobe",
     help="nvProbe — run CUDA workloads, generate reports, compare hardware.",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 console = Console()
 
@@ -513,6 +514,40 @@ def slurm_cmd(
     if action in ("collect", "full"):
         results = manager.collect_results()
         console.print(f"[green]Collected {len(results)} results[/green]")
+
+
+@app.command(name="version")
+def version_cmd() -> None:
+    """Print nvprobe version."""
+    console.print(f"nvprobe v{__version__}")
+
+
+@app.command(name="config")
+def config_validate(
+    config: Path = typer.Option(
+        Path("nvprobe/configs/local.yaml"), "--config", "-c",
+        help="YAML config file to validate.",
+    ),
+) -> None:
+    """Validate a config file."""
+    from nvprobe.config import load_config
+
+    if not config.exists():
+        console.print(f"[red]Config file not found:[/red] {config}")
+        raise typer.Exit(1)
+
+    try:
+        cfg = load_config(config)
+        benchmarks = [b.name for b in cfg.benchmarks]
+        console.print(f"[green]Config valid[/green] — {config}")
+        console.print(f"  Name:        {cfg.name}")
+        console.print(f"  Precisions:  {', '.join(cfg.precisions)}")
+        console.print(f"  Batch sizes: {', '.join(str(b) for b in cfg.batch_sizes)}")
+        console.print(f"  Benchmarks:  {', '.join(benchmarks) if benchmarks else 'none'}")
+        console.print(f"  Slurm:       {'enabled' if cfg.slurm.enabled else 'disabled'}")
+    except Exception as exc:
+        console.print(f"[red]Config invalid:[/red] {exc}")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

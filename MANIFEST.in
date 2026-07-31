@@ -4,3 +4,5 @@ include README.md
 recursive-include nvprobe *.py
 recursive-include nvprobe *.yaml
 recursive-include nvprobe *.svg
+prune tests
+exclude .gitignore .github
