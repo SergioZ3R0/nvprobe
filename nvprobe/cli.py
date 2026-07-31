@@ -102,7 +102,7 @@ def env() -> None:
 @app.command()
 def version() -> None:
     """Print version and exit."""
-    console.print(f"nvprobe {__version__}")
+    console.print(f"nvprobe v{__version__}")
 
 
 # ---------------------------------------------------------------------------
@@ -514,12 +514,6 @@ def slurm_cmd(
     if action in ("collect", "full"):
         results = manager.collect_results()
         console.print(f"[green]Collected {len(results)} results[/green]")
-
-
-@app.command(name="version")
-def version_cmd() -> None:
-    """Print nvprobe version."""
-    console.print(f"nvprobe v{__version__}")
 
 
 @app.command(name="config")
