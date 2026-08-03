@@ -6,6 +6,16 @@
     <title>Documentation — nvprobe</title>
     <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
     <meta name="description" content="nvprobe documentation: benchmark config reference, example configs, how benchmarks work, Slurm quickstart, and environment diagnostics.">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Documentation — nvprobe">
+    <meta property="og:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
+    <meta property="og:url" content="https://nvprobe.scszero.com/docs/">
+    <meta property="og:site_name" content="nvprobe">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Documentation — nvprobe">
+    <meta name="twitter:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
     <link rel="canonical" href="https://nvprobe.scszero.com/docs/">
     <style>
         :root {
@@ -186,7 +196,7 @@ Generated reports land in <code>nvprobe/reports/</code>.</p>
 
 <!-- ─────────────────────────────────────────────────────────────── -->
 
-<h2>Config Reference</h2>
+<h2 id="config-reference">Config Reference</h2>
 <p>Every benchmark in a YAML config supports its own <code>params</code> block.
 Below are all recognized parameters per benchmark.</p>
 
