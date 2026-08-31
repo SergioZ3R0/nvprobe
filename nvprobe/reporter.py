@@ -976,6 +976,7 @@ def generate_report(
     results_dir: Path,
     output_dir: Path,
     title: str | None = None,
+    run_id: int | None = None,
 ) -> Path:
     """Generate a full HTML report from benchmark results."""
     db_path = results_dir / "benchmarks.db"
@@ -987,11 +988,21 @@ def generate_report(
         if not runs:
             raise ValueError("No runs found in database")
 
-        latest_run = runs[0]
+        if run_id is not None:
+            target_run = next((r for r in runs if r["id"] == run_id), None)
+            if target_run is None:
+                raise ValueError(f"Run ID {run_id} not found. Use 'nvprobe list' to see available runs.")
+            latest_run = target_run
+        else:
+            latest_run = runs[0]
         results = db.get_results(latest_run["id"])
         env_info = json.loads(latest_run.get("environment") or "{}")
 
     report_title = title or f"nvProbe Report — {latest_run['name']}"
+
+    run_id_actual = latest_run["id"]
+    run_dir = output_dir / f"run-{run_id_actual}"
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate charts
     charts: dict[str, str] = {}
@@ -1014,23 +1025,21 @@ def generate_report(
 
     # Copy logo to reports directory
     logo_src = Path(__file__).parent / "nvprobe.svg"
-    logo_dst = output_dir / "nvprobe.svg"
+    logo_dst = run_dir / "nvprobe.svg"
     if logo_src.exists():
         import shutil
         shutil.copy2(logo_src, logo_dst)
 
     html = _render_html(report_title, latest_run, results, env_info, charts, logo_src.exists())
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    report_path = output_dir / "report.html"
+    report_path = run_dir / "report.html"
     report_path.write_text(html, encoding="utf-8")
 
     # Also export CSV/JSON
     try:
         with Database(db_path) as db2:
-            csv_path = db2.export_csv(latest_run["id"], output_dir / "results.csv")
-            json_path = db2.export_json(latest_run["id"], output_dir / "results.json")
+            csv_path = db2.export_csv(latest_run["id"], run_dir / "results.csv")
+            json_path = db2.export_json(latest_run["id"], run_dir / "results.json")
     except ValueError:
         pass
 
@@ -1038,29 +1047,62 @@ def generate_report(
 
 
 def generate_comparison(
-    results_a: Path,
-    results_b: Path,
+    results_a: Path | None,
+    results_b: Path | None,
     output_dir: Path,
+    db_path: Path | None = None,
+    run_id_a: int | None = None,
+    run_id_b: int | None = None,
 ) -> Path:
-    """Generate a comparison HTML report between two result sets."""
-    with Database(results_a / "benchmarks.db") as db_a, Database(results_b / "benchmarks.db") as db_b:
-        runs_a = db_a.get_runs()
-        runs_b = db_b.get_runs()
+    """Generate a comparison HTML report between two result sets.
+    
+    If db_path is provided with run_id_a/run_id_b, compare two runs within same DB.
+    Otherwise, compare two directories each containing a benchmarks.db.
+    """
+    if db_path is not None and run_id_a is not None and run_id_b is not None:
+        db_file = db_path / "benchmarks.db"
+        with Database(db_file) as db:
+            runs = db.get_runs()
+            run_a = next((r for r in runs if r["id"] == run_id_a), None)
+            run_b = next((r for r in runs if r["id"] == run_id_b), None)
+            if run_a is None:
+                raise ValueError(f"Run ID {run_id_a} not found")
+            if run_b is None:
+                raise ValueError(f"Run ID {run_id_b} not found")
+            results_a_data = db.get_results(run_id_a)
+            results_b_data = db.get_results(run_id_b)
+            env_a = json.loads(run_a.get("environment") or "{}")
+            env_b = json.loads(run_b.get("environment") or "{}")
+    elif results_a is not None and results_b is not None:
+        with Database(results_a / "benchmarks.db") as db_a, Database(results_b / "benchmarks.db") as db_b:
+            runs_a = db_a.get_runs()
+            runs_b = db_b.get_runs()
 
-        if not runs_a or not runs_b:
-            raise ValueError("Both result sets must have at least one run")
+            if not runs_a or not runs_b:
+                raise ValueError("Both result sets must have at least one run")
 
-        results_a_data = db_a.get_results(runs_a[0]["id"])
-        results_b_data = db_b.get_results(runs_b[0]["id"])
+            run_a = runs_a[0]
+            run_b = runs_b[0]
+            results_a_data = db_a.get_results(run_a["id"])
+            results_b_data = db_b.get_results(run_b["id"])
+            env_a = json.loads(run_a.get("environment") or "{}")
+            env_b = json.loads(run_b.get("environment") or "{}")
+    else:
+        raise ValueError("Either --a/--b or --a-run/--b-run must be provided")
 
-        env_a = json.loads(runs_a[0].get("environment") or "{}")
-        env_b = json.loads(runs_b[0].get("environment") or "{}")
+    html = _render_comparison_html(run_a, results_a_data, env_a, run_b, results_b_data, env_b)
 
-    html = _render_comparison_html(runs_a[0], results_a_data, env_a, runs_b[0], results_b_data, env_b)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    report_path = output_dir / "comparison.html"
+    run_dir = output_dir / f"compare-run{run_a['id']}-vs-run{run_b['id']}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    report_path = run_dir / "comparison.html"
     report_path.write_text(html, encoding="utf-8")
+
+    # Copy logo
+    logo_src = Path(__file__).parent / "nvprobe.svg"
+    if logo_src.exists():
+        import shutil
+        shutil.copy2(logo_src, run_dir / "nvprobe.svg")
+
     return report_path
 
 

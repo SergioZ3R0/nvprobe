@@ -66,28 +66,91 @@ def report(
     title: Optional[str] = typer.Option(
         None, "--title", "-t", help="Report title.",
     ),
+    run_id: Optional[int] = typer.Option(
+        None, "--run-id", help="Generate report for a specific run (default: latest).",
+    ),
 ) -> None:
     """Generate an HTML report from benchmark results."""
     from nvprobe.reporter import generate_report
 
     console.print(f"[bold green]Generating report from {results}[/bold green]")
-    generate_report(results, output, title=title)
+    generate_report(results, output, title=title, run_id=run_id)
 
 
 @app.command()
 def compare(
-    results_a: Path = typer.Option(..., "--a", help="First result set (baseline)."),
-    results_b: Path = typer.Option(..., "--b", help="Second result set (comparison)."),
+    results_a: Path = typer.Option(
+        None, "--a", help="First result set directory (baseline).",
+    ),
+    results_b: Path = typer.Option(
+        None, "--b", help="Second result set directory (comparison).",
+    ),
+    a_run: Optional[int] = typer.Option(
+        None, "--a-run", help="Run ID for baseline (uses same DB as --b-run).",
+    ),
+    b_run: Optional[int] = typer.Option(
+        None, "--b-run", help="Run ID for comparison (uses same DB as --a-run).",
+    ),
+    results: Path = typer.Option(
+        Path("nvprobe/results"), "--results", "-r", help="Results directory for same-DB comparison.",
+    ),
     output: Path = typer.Option(
         Path("nvprobe/reports"), "--output", "-o", help="Directory for comparison report.",
     ),
 ) -> None:
-    """Compare two result sets side-by-side."""
+    """Compare two result sets side-by-side.
+
+    Use --a and --b to compare two directories with separate databases.
+    Use --a-run and --b-run to compare two runs within the same database.
+    """
     from nvprobe.reporter import generate_comparison
 
-    console.print(f"[bold green]Comparing {results_a} vs {results_b}[/bold green]")
-    generate_comparison(results_a, results_b, output)
+    if a_run is not None and b_run is not None:
+        console.print(f"[bold green]Comparing run {a_run} vs run {b_run} in {results}[/bold green]")
+        generate_comparison(None, None, output, db_path=results, run_id_a=a_run, run_id_b=b_run)
+    elif results_a is None or results_b is None:
+        console.print("[red]Either --a/--b or --a-run/--b-run must be provided[/red]")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[bold green]Comparing {results_a} vs {results_b}[/bold green]")
+        generate_comparison(results_a, results_b, output)
 
+
+@app.command()
+def list(
+    results: Path = typer.Option(
+        Path("nvprobe/results"), "--results", "-r", help="Results directory.",
+    ),
+) -> None:
+    """List all stored benchmark runs."""
+    import json
+    from nvprobe.db import Database
+
+    db_path = results / "benchmarks.db"
+    if not db_path.exists():
+        console.print(f"[red]No benchmarks.db found in {results}[/red]")
+        raise typer.Exit(1)
+
+    with Database(db_path) as db:
+        runs = db.get_runs()
+        if not runs:
+            console.print("[dim]No runs found.[/dim]")
+            return
+
+        console.print(f"[bold]Runs in {results}/benchmarks.db:[/bold]")
+        for r in runs:
+            gpu_count = 0
+            env = r.get("environment")
+            if env and isinstance(env, str):
+                try:
+                    env_data = json.loads(env)
+                    gpu_count = len(env_data.get("gpus", []))
+                except Exception:
+                    pass
+            console.print(
+                f"  [bold cyan]#{r['id']}[/bold cyan]  {r['name']:25s}  "
+                f"{r['created_at'][:19]:19s}  {gpu_count} GPU(s)"
+            )
 
 @app.command()
 def env() -> None:

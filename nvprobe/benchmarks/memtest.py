@@ -49,10 +49,21 @@ class MemtestBenchmark(BaseBenchmark):
             except (subprocess.CalledProcessError, json.JSONDecodeError,
                     subprocess.TimeoutExpired) as exc:
                 stderr = getattr(exc, "stderr", "") or ""
+                stdout = getattr(exc, "stdout", "") or ""
+                error_msg = f"{exc}"
+                if stdout:
+                    try:
+                        data = json.loads(stdout)
+                        if "error" in data:
+                            error_msg = data["error"]
+                    except json.JSONDecodeError:
+                        error_msg += f"\n{stdout.strip()}"
+                if stderr:
+                    error_msg += f"\n{stderr.strip()}"
                 return BenchmarkResult(
                     benchmark=self.name, gpu_model="unknown",
                     gpu_index=gpu_index, precision=precision, batch_size=batch_size,
-                    success=False, error=f"{exc}\n{stderr}".strip(),
+                    success=False, error=error_msg,
                 )
 
         return BenchmarkResult(

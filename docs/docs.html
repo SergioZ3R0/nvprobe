@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation — nvprobe</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+    <meta name="description" content="nvprobe documentation: benchmark config reference, example configs, how benchmarks work, Slurm quickstart, and environment diagnostics.">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Documentation — nvprobe">
+    <meta property="og:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
+    <meta property="og:url" content="https://nvprobe.scszero.com/docs.html">
+    <meta property="og:site_name" content="nvprobe">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Documentation — nvprobe">
+    <meta name="twitter:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
+    <link rel="canonical" href="https://nvprobe.scszero.com/docs.html">
+    <style>
+        :root {
+            --bg: #0B0E10;
+            --surface: #14181B;
+            --accent: #39FF88;
+            --accent-warn: #FFB020;
+            --accent-fail: #FF5C5C;
+            --text: #E8ECEF;
+            --muted: #7C8791;
+            --border: rgba(255,255,255,0.08);
+            --radius: 8px;
+            --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --sidebar-w: 260px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: var(--sidebar-w);
+            background: #0B0E10;
+            color: #E8ECEF;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            overflow-y: auto;
+            padding: 24px 0 24px 0;
+            z-index: 10;
+        }
+        .sidebar-header {
+            padding: 0 20px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sidebar-header svg { width: 36px; height: 36px; flex-shrink: 0; }
+        .sidebar-header .title { font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+        .sidebar-section {
+            padding: 8px 20px 4px;
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--muted); font-family: var(--font-mono); font-weight: 600;
+        }
+        .sidebar a {
+            display: block; padding: 6px 20px; font-size: 0.85rem;
+            color: var(--muted); text-decoration: none; font-family: var(--font-mono);
+            border-left: 2px solid transparent; transition: all .15s;
+        }
+        .sidebar a:hover, .sidebar a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(57,255,136,0.04); }
+        .sidebar-footer {
+            padding: 20px 20px 0; margin-top: auto;
+            border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.75rem; color: #7C8791;
+        }
+        .sidebar-footer a { color: var(--accent); text-decoration: none; }
+
+        /* Main content */
+        .content {
+            margin-left: var(--sidebar-w);
+            flex: 1; padding: 48px 56px; max-width: 900px;
+        }
+        .content h1 { font-family: var(--font-mono); font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+        .content h1 span.nv { color: var(--text); }
+        .content h1 span.pr { color: var(--accent); }
+        .content .intro { color: var(--muted); font-size: 1rem; margin-bottom: 40px; max-width: 640px; }
+        .content h2 {
+            font-family: var(--font-mono); font-size: 1.3rem; color: var(--accent);
+            margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+        }
+        .content h3 {
+            font-family: var(--font-mono); font-size: 1rem; color: var(--text);
+            margin: 28px 0 8px;
+        }
+        .content p { margin-bottom: 12px; font-size: 0.92rem; }
+        .content ul, .content ol { margin: 0 0 16px 20px; font-size: 0.92rem; }
+        .content li { margin-bottom: 4px; }
+        .content code {
+            font-family: var(--font-mono); font-size: 0.82rem;
+            background: var(--surface); padding: 2px 6px; border-radius: 4px;
+            color: var(--accent); border: 1px solid var(--border);
+        }
+        .content pre {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px 20px; overflow-x: auto;
+            margin: 12px 0 20px; font-size: 0.8rem; line-height: 1.6;
+        }
+        .content pre code { background: none; border: none; padding: 0; color: var(--text); }
+        .content pre .kw { color: var(--accent); }
+        .content pre .cm { color: var(--muted); font-style: italic; }
+        .content table {
+            width: 100%; border-collapse: collapse; margin: 12px 0 20px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+        }
+        .content th {
+            background: var(--surface); color: var(--accent); padding: 8px 12px;
+            text-align: left; font-size: 0.8rem; font-family: var(--font-mono); font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+        .content td {
+            padding: 6px 12px; border-bottom: 1px solid var(--border);
+            font-size: 0.82rem; font-family: var(--font-mono);
+        }
+        .content tr:last-child td { border-bottom: none; }
+        .note {
+            background: rgba(57,255,136,0.06); border-left: 3px solid var(--accent);
+            padding: 10px 16px; margin: 16px 0; border-radius: 0 var(--radius) var(--radius) 0;
+            font-size: 0.85rem; color: var(--muted);
+        }
+        .note strong { color: var(--accent); }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .content { margin-left: 0; padding: 24px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar" aria-label="Documentation navigation">
+    <div class="sidebar-header">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="36" height="36" role="img">
+            <rect x="50" y="50" width="100" height="100" rx="12" fill="#14181B" stroke="#39FF88" stroke-width="4"/>
+            <path d="M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15" stroke="#39FF88" stroke-width="4" stroke-linecap="round"/>
+            <polyline points="65,110 85,110 100,75 115,120 135,95" fill="none" stroke="#39FF88" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+        <span class="title">nvprobe</span>
+    </div>
+    <div class="sidebar-section">Getting Started</div>
+    <a href="#intro">Overview</a>
+    <a href="#quickstart">Quickstart</a>
+    <div class="sidebar-section">Reference</div>
+    <a href="#config-bandwidth">bandwidth</a>
+    <a href="#config-memtest">memtest</a>
+    <a href="#config-burn">burn</a>
+    <a href="#config-custom">custom</a>
+    <a href="#config-hpl">hpl</a>
+    <a href="#config-hpcg">hpcg</a>
+    <a href="#config-mlperf">mlperf</a>
+    <div class="sidebar-section">Guides</div>
+    <a href="#example-configs">Example Configs</a>
+    <a href="#how-benchmarks-work">How Benchmarks Work</a>
+    <a href="#slurm-quickstart">Slurm Quickstart</a>
+    <a href="#environment">Environment Diagnostics</a>
+    <div class="sidebar-footer">
+        <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a><br>
+        <a href="https://github.com/SergioZ3R0/nvprobe">GitHub</a>
+    </div>
+</nav>
+
+<main class="content">
+
+<h1 id="intro"><span class="nv">nv</span><span class="pr">probe</span> Documentation</h1>
+<p class="intro">
+    nvprobe runs its own optimized CUDA workloads via CuPy and cuBLAS — no external model files,
+    no PyTorch/TensorFlow wrappers. Every benchmark is self-contained.
+    Install, configure, and get GPU performance numbers in minutes.
+</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="quickstart">Quickstart</h2>
+<pre><code>pip install nvprobe
+nvprobe setup -f
+nvprobe run --local
+nvprobe report
+</code></pre>
+
+<p>The <code>run --local</code> command reads <code>nvprobe/configs/local.yaml</code> by default.
+Generated reports land in <code>nvprobe/reports/</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="config-reference">Config Reference</h2>
+<p>Every benchmark in a YAML config supports its own <code>params</code> block.
+Below are all recognized parameters per benchmark.</p>
+
+<h3 id="config-bandwidth">bandwidth</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>sizes_mb</code></td><td>list[int]</td><td><code>[1, 4, 16, 64, 256, 1024]</code></td><td>Buffer sizes in MB for H2D / D2H / D2D transfers</td></tr>
+    <tr><td><code>iterations</code></td><td>int</td><td><code>100</code></td><td>Measurement iterations per size (higher = more stable)</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> bandwidth
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256, 1024, 4096</span>]
+<span class="kw">    iterations:</span> 100
+</code></pre>
+
+<h3 id="config-memtest">memtest</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>sizes_mb</code></td><td>list[int]</td><td><code>[1024]</code></td><td>VRAM segment to test (MB per run). Actual size capped at 85 % free memory.</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> memtest
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    sizes_mb:</span> [<span class="cm">1024, 4096</span>]
+</code></pre>
+<p>Runs 7 patterns: solid 0x00 / 0xFF, checkerboard 0xAA / 0x55, pseudo-random, walking‑1 high/low.
+Reports total errors per pattern.</p>
+
+<h3 id="config-burn">burn</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>duration_sec</code></td><td>int</td><td><code>30</code></td><td>Sustained load duration in seconds</td></tr>
+    <tr><td><code>matrix_size</code></td><td>int</td><td><code>8192</code></td><td>Square matrix dimension (N) for cuBLAS SGEMM</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> burn
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    duration_sec:</span> 60
+<span class="kw">    matrix_size:</span> 16384
+</code></pre>
+<p>Samples SM/MEM clocks, temperature, and power every second.
+Throttling is flagged if the SM clock drops &gt;15 % from its initial value.</p>
+
+<h3 id="config-custom">custom</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>kernels</code></td><td>list[str]</td><td><code>[matmul, attention]</code></td><td>Kernels to run: <code>matmul</code>, <code>tiled_matmul</code>, <code>attention</code>, <code>conv2d</code></td></tr>
+    <tr><td><code>matrix_sizes</code></td><td>list[int]</td><td><code>[512, 1024, 2048]</code></td><td>Problem sizes (N for N×N, or seq_len for attention)</td></tr>
+    <tr><td><code>iterations</code></td><td>int</td><td><code>50</code></td><td>Measurement iterations per kernel per size</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> custom
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    kernels:</span> [<span class="cm">matmul, tiled_matmul, attention, conv2d</span>]
+<span class="kw">    matrix_sizes:</span> [<span class="cm">512, 1024, 2048, 4096</span>]
+<span class="kw">    iterations:</span> 50
+</code></pre>
+<div class="note"><strong>Requires CuPy [ctk] extras.</strong> Without CUDA toolkit headers, custom kernels fall back with an allocation error. Install with <code>pip install cupy-cuda12x[ctk]</code>.</div>
+
+<h3 id="config-hpl">hpl</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>problem_sizes</code></td><td>list[int]</td><td><code>[4096, 8192]</code></td><td>HPL matrix sizes N. Auto-calculated from GPU memory if empty.</td></tr>
+    <tr><td><code>binary</code></td><td>str</td><td><code>~/.nvprobe/tools/xhpl</code></td><td>Path to xhpl binary</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> hpl
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    problem_sizes:</span> [<span class="cm">4096, 8192, 16384</span>]
+<span class="kw">    binary:</span> <span class="cm">"~/.nvprobe/tools/xhpl"</span>
+</code></pre>
+<div class="note"><strong>Datacenter GPUs only</strong> (A100, H100, B200, L40S). RTX cards may crash (SIGSEGV).
+On Blackwell GPUs ensure OpenMPI &ge; 5.x — older MPI versions may segfault.</div>
+
+<h3 id="config-hpcg">hpcg</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>grid_sizes</code></td><td>list[int]</td><td><code>[128, 256]</code></td><td>3D grid sizes (uniform n<sub>x</sub> = n<sub>y</sub> = n<sub>z</sub>)</td></tr>
+    <tr><td><code>binary</code></td><td>str</td><td><code>~/.nvprobe/tools/xhpcg</code></td><td>Path to xhpcg binary</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> hpcg
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    grid_sizes:</span> [<span class="cm">128, 256, 512</span>]
+<span class="kw">    binary:</span> <span class="cm">"~/.nvprobe/tools/xhpcg"</span>
+</code></pre>
+<div class="note"><strong>Same GPU / MPI constraints as HPL.</strong></div>
+
+<h3 id="config-mlperf">mlperf</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>model</code></td><td>str</td><td><code>resnet50</code></td><td>MLPerf model name</td></tr>
+    <tr><td><code>framework</code></td><td>str</td><td><code>onnxruntime</code></td><td>Inference framework</td></tr>
+    <tr><td><code>scenario</code></td><td>str</td><td><code>Offline</code></td><td>MLPerf scenario</td></tr>
+    <tr><td><code>category</code></td><td>str</td><td><code>edge</code></td><td><code>edge</code> or <code>datacenter</code></td></tr>
+    <tr><td><code>implementation</code></td><td>str</td><td><code>reference</code></td><td>MLPerf implementation</td></tr>
+    <tr><td><code>test_query_count</code></td><td>int</td><td><code>100</code></td><td>Number of queries for test mode</td></tr>
+    <tr><td><code>mode</code></td><td>str</td><td><code>test</code></td><td><code>test</code>, <code>find_performance</code>, or <code>full</code></td></tr>
+    <tr><td><code>batch_size</code></td><td>int</td><td>—</td><td>Optional custom batch size override</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> mlperf
+<span class="kw">  enabled:</span> false  <span class="cm"># requires: pip install cmx4mlperf</span>
+<span class="kw">  params:</span>
+<span class="kw">    model:</span> resnet50
+<span class="kw">    framework:</span> onnxruntime
+<span class="kw">    scenario:</span> Offline
+<span class="kw">    category:</span> edge
+<span class="kw">    implementation:</span> reference
+<span class="kw">    test_query_count:</span> 100
+</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="example-configs">Example Configs</h2>
+
+<h3>Local workstation</h3>
+<pre><code class="language-yaml"><span class="kw">name:</span> workstation
+<span class="kw">precisions:</span> [<span class="cm">fp32, fp16</span>]
+<span class="kw">batch_sizes:</span> [<span class="cm">1, 32, 64</span>]
+<span class="kw">benchmarks:</span>
+<span class="kw">  - name:</span> bandwidth
+<span class="kw">    params:</span>
+<span class="kw">      sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256</span>]
+<span class="kw">      iterations:</span> 50
+<span class="kw">  - name:</span> memtest
+<span class="kw">  - name:</span> burn
+<span class="kw">    params:</span>
+<span class="kw">      duration_sec:</span> 30
+</code></pre>
+
+<h3>Infrastructure audit only</h3>
+<pre><code class="language-yaml"><span class="kw">name:</span> node-audit
+<span class="kw">gpu:</span>
+<span class="kw">  min_count:</span> 1
+<span class="kw">benchmarks:</span>
+<span class="kw">  - name:</span> memtest
+<span class="kw">    params:</span>
+<span class="kw">      sizes_mb:</span> [<span class="cm">4096, 16384</span>]
+<span class="kw">  - name:</span> burn
+<span class="kw">    params:</span>
+<span class="kw">      duration_sec:</span> 60
+<span class="kw">      matrix_size:</span> 16384
+<span class="kw">  - name:</span> bandwidth
+<span class="kw">    params:</span>
+<span class="kw">      sizes_mb:</span> [<span class="cm">256, 1024, 4096</span>]
+<span class="kw">      iterations:</span> 100
+</code></pre>
+
+<h3>HPC cluster (Slurm)</h3>
+<pre><code class="language-yaml"><span class="kw">name:</span> cluster-suite
+<span class="kw">slurm:</span>
+<span class="kw">  enabled:</span> true
+<span class="kw">  partition:</span> gpu
+<span class="kw">  nodes:</span> 4
+<span class="kw">  gpus_per_node:</span> 8
+<span class="kw">  time_limit:</span> <span class="cm">"02:00:00"</span>
+<span class="kw">precisions:</span> [<span class="cm">fp32, fp16</span>]
+<span class="kw">batch_sizes:</span> [<span class="cm">1, 32, 64, 128, 256</span>]
+<span class="kw">benchmarks:</span>
+<span class="kw">  - name:</span> bandwidth
+<span class="kw">    params:</span>
+<span class="kw">      sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256, 1024, 4096</span>]
+<span class="kw">      iterations:</span> 100
+<span class="kw">  - name:</span> memtest
+<span class="kw">    params:</span>
+<span class="kw">      sizes_mb:</span> [<span class="cm">4096, 16384</span>]
+<span class="kw">  - name:</span> burn
+<span class="kw">    params:</span>
+<span class="kw">      duration_sec:</span> 60
+<span class="kw">      matrix_size:</span> 16384
+<span class="kw">  - name:</span> hpl
+<span class="kw">    params:</span>
+<span class="kw">      problem_sizes:</span> [<span class="cm">4096, 8192, 16384, 32768</span>]
+<span class="kw">  - name:</span> hpcg
+<span class="kw">    params:</span>
+<span class="kw">      grid_sizes:</span> [<span class="cm">128, 256, 512</span>]
+</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="how-benchmarks-work">How Benchmarks Work</h2>
+
+<p>
+Each benchmark runs as an <strong>independent subprocess</strong> launched via
+<code>sys.executable -m nvprobe.benchmarks._cuda.&lt;name&gt;</code>.
+Output is captured as JSON, parsed, and stored in the local SQLite database.
+</p>
+
+<ul>
+    <li><strong>bandwidth, memtest, burn</strong> — use CuPy + NumPy.
+        No CUDA toolkit required.</li>
+    <li><strong>custom</strong> — requires CuPy with <code>[ctk]</code> extras
+        (CUDA toolkit headers for JIT kernel compilation).</li>
+    <li><strong>hpl, hpcg</strong> — call NVIDIA HPC Benchmarks binaries
+        (<code>xhpl</code> / <code>xhpch</code>) via MPI.</li>
+    <li><strong>mlperf</strong> — drives <code>cmx4mlperf</code>
+        (the MLCommons cm framework).</li>
+</ul>
+
+<div class="note">
+    <strong>nvprobe is not a PyTorch/TensorFlow wrapper.</strong>
+    It does not run user-provided model scripts or datasets.
+    Benchmarks are self-contained CUDA workloads optimized for hardware validation.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="slurm-quickstart">Slurm Quickstart</h2>
+
+<h3>1. Prepare a config</h3>
+<p>Use the <em>HPC cluster</em> example above or generate one:</p>
+<pre><code>nvprobe init -f
+nvprobe run --config nvprobe/configs/default.yaml --dry-run
+</code></pre>
+
+<h3>2. Submit to Slurm</h3>
+<pre><code>nvprobe slurm --config nvprobe/configs/default.yaml --action full
+</code></pre>
+
+<p>This single command:</p>
+<ol>
+    <li><strong>Generates</strong> one sbatch script per node.</li>
+    <li><strong>Submits</strong> all scripts.</li>
+    <li><strong>Monitors</strong> job progress (polls every 30 s).</li>
+    <li><strong>Collects &amp; merges</strong> per-node databases into a single <code>benchmarks.db</code>.</li>
+</ol>
+
+<h3>3. Generate the report</h3>
+<pre><code>nvprobe report --results nvprobe/results
+</code></pre>
+
+<p>Each node writes its own database (<code>node_0/benchmarks.db</code>,
+<code>node_1/benchmarks.db</code>, …). GPUs are re-indexed globally and
+hostnames are appended to model names in the merged environment table.</p>
+
+<div class="note">
+    <strong>Per-node, not per-benchmark.</strong>
+    One Slurm job runs <em>all</em> benchmarks on all GPUs of a single node.
+    This keeps scheduler overhead low and captures a clean per-node fingerprint.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+
+<h2 id="environment">Environment Diagnostics</h2>
+
+<p>
+Every run captures a full environment fingerprint stored as JSON alongside
+the benchmark results. The HTML report shows these fields in the Environment table:
+</p>
+
+<table>
+    <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+    <tr><td>GPU model</td><td>nvidia-smi</td><td>Hostname appended in Slurm merged reports</td></tr>
+    <tr><td>Memory total</td><td>nvidia-smi</td><td>MiB</td></tr>
+    <tr><td>SM Clock (max)</td><td><code>clocks.max.sm</code></td><td>Hardware ceiling — detects degraded silicon</td></tr>
+    <tr><td>Mem Clock (max)</td><td><code>clocks.max.mem</code></td><td>Hardware ceiling</td></tr>
+    <tr><td>Power Limit</td><td><code>power.limit</code></td><td>Watts — N/A on WDDM (Windows)</td></tr>
+    <tr><td>ECC mode</td><td><code>ecc.mode.current</code></td><td>Enabled / Disabled / N/A</td></tr>
+    <tr><td>ECC errors</td><td><code>ecc.errors.corrected / uncorrected</code></td><td>Cumulative volatile counts</td></tr>
+    <tr><td>PCIe link (max)</td><td><code>pcie.link.gen.max</code> × <code>pcie.link.width.max</code></td><td>Maximum negotiated link speed</td></tr>
+    <tr><td>NVLink active links</td><td><code>nvlink.active.links</code> + fallback <code>nvlink -s</code></td><td>B200 / NVSwitch compatible</td></tr>
+    <tr><td>Driver / CUDA</td><td>nvidia-smi banner</td><td>Also shown in overview cards</td></tr>
+</table>
+
+<div class="note">
+    <strong>Baseline today, re-run in 6 months.</strong>
+    If the max SM clock dropped or an NVLink link went inactive, the report
+    makes the regression instantly attributable. No guesswork.
+</div>
+
+</main>
+
+<script>
+(function() {
+    var links = document.querySelectorAll('.sidebar a');
+    var headings = document.querySelectorAll('.content h2, .content h3');
+    function setActive() {
+        var id = '';
+        for (var i = headings.length-1; i >= 0; i--) {
+            if (headings[i].getBoundingClientRect().top < 120) { id = headings[i].id; break; }
+        }
+        links.forEach(function(l) {
+            l.classList.toggle('active', l.getAttribute('href') === '#' + id);
+        });
+    }
+    window.addEventListener('scroll', setActive);
+    setActive();
+})();
+</script>
+
+</body>
+</html>

@@ -19,8 +19,12 @@ import threading
 import time
 from typing import Any
 
-import cupy as cp
-import numpy as np
+try:
+    import cupy as cp
+    import numpy as np
+except ImportError as exc:
+    print(json.dumps({"error": f"CuPy import failed: {exc}"}))
+    sys.exit(1)
 
 
 def _sample_clocks(

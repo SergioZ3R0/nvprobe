@@ -1,22 +1,59 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation — nvprobe</title>
-    <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
-    <meta name="description" content="nvprobe documentation: benchmark config reference, example configs, how benchmarks work, Slurm quickstart, and environment diagnostics.">
+    <title>nvprobe | Lightweight NVIDIA GPU Benchmarking &amp; Profiling CLI</title>
+    <meta name="description" content="nvprobe automates CUDA workloads, HPL, HPCG, and MLPerf inference from a single CLI. Profile custom kernels, compare GPU hardware, and generate interactive HTML reports with no system CUDA toolkit required.">
+    <meta name="keywords" content="NVIDIA GPU benchmark, CUDA profiling, HPL, HPCG, MLPerf inference, GPU comparison, Slurm HPC, CuPy, GPU bandwidth test, GPU matmul benchmark">
+
     <!-- Open Graph -->
-    <meta property="og:type" content="article">
-    <meta property="og:title" content="Documentation — nvprobe">
-    <meta property="og:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
-    <meta property="og:url" content="https://nvprobe.scszero.com/docs/">
+    <meta property="og:title" content="nvprobe | Lightweight NVIDIA GPU Benchmarking">
+    <meta property="og:description" content="Automate CUDA workloads, HPL, HPCG, and MLPerf inference from a single CLI.">
+    <meta property="og:url" content="https://nvprobe.scszero.com">
+    <meta property="og:image" content="https://nvprobe.scszero.com/nvprobe_banner.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:type" content="software">
     <meta property="og:site_name" content="nvprobe">
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Documentation — nvprobe">
-    <meta name="twitter:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
-    <link rel="canonical" href="https://nvprobe.scszero.com/docs/">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="nvprobe | Lightweight NVIDIA GPU Benchmarking &amp; Profiling">
+    <meta name="twitter:description" content="Automate CUDA workloads, HPL, HPCG, and MLPerf inference from a single CLI.">
+    <meta name="twitter:image" content="https://nvprobe.scszero.com/nvprobe_banner.png">
+
+    <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="canonical" href="https://nvprobe.scszero.com/">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "nvprobe",
+        "operatingSystem": "Linux",
+        "applicationCategory": "DeveloperApplication",
+        "description": "Automate CUDA workloads, run HPL & HPCG, profile custom kernels, benchmark MLPerf inference, compare hardware, and generate interactive HTML reports — all from a single CLI.",
+        "url": "https://nvprobe.scszero.com/",
+        "sameAs": "https://github.com/SergioZ3R0/nvprobe",
+        "offers": {
+            "@type": "Offer",
+            "price": 0,
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "SergioZ3R0",
+            "url": "https://github.com/SergioZ3R0"
+        }
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --bg: #0B0E10;
@@ -27,466 +64,608 @@
             --text: #E8ECEF;
             --muted: #7C8791;
             --border: rgba(255,255,255,0.08);
-            --radius: 8px;
+            --radius: 12px;
             --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
             --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-            --sidebar-w: 260px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: var(--font-sans);
             background: var(--bg);
             color: var(--text);
-            line-height: 1.7;
-            display: flex;
-            min-height: 100vh;
+            line-height: 1.6;
         }
+        .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
 
-        /* Sidebar */
-        .sidebar {
-            position: fixed; top: 0; left: 0; bottom: 0;
-            width: var(--sidebar-w);
-            background: #0B0E10;
-            color: #E8ECEF;
-            border-right: 1px solid rgba(255,255,255,0.08);
-            overflow-y: auto;
-            padding: 24px 0 24px 0;
-            z-index: 10;
+        nav {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .sidebar-header {
-            padding: 0 20px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            margin-bottom: 12px;
+        nav .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        nav .logo svg { width: 44px; height: 44px; }
+        nav .logo span { font-weight: 700; font-size: 1.3rem; color: var(--accent); font-family: var(--font-mono); }
+        nav a:not(.logo) { color: var(--muted); text-decoration: none; margin-left: 24px; font-size: 0.9rem; transition: color .2s; font-family: var(--font-mono); font-size: 0.85rem; }
+        nav a:not(.logo):hover { color: var(--text); }
+        .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px 10px; border-radius: 6px; margin-left: 12px; transition: border-color .2s; line-height: 1; }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+        header {
+            padding: 80px 0 60px;
+            text-align: center;
+        }
+        header .logo-big svg { width: 180px; height: 180px; margin-bottom: 32px; }
+        header h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.02em; font-family: var(--font-mono); }
+        header h1 span { color: var(--accent); }
+        header p { font-size: 1.25rem; color: var(--muted); max-width: 640px; margin: 16px auto 32px; }
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            border-radius: var(--radius);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all .2s;
+            margin: 0 8px;
+            font-family: var(--font-mono);
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: #5cffa0; transform: translateY(-1px); }
+        .btn-outline { border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--muted); transform: translateY(-1px); }
+
+        .badge-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 20px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+        }
+        .badge-py { background: #1a3a5c; color: var(--accent); }
+        .badge-cuda { background: rgba(57,255,136,0.12); color: var(--accent); }
+        .badge-hpc { background: rgba(255,176,32,0.12); color: var(--accent-warn); }
+        .badge-ml { background: rgba(255,92,92,0.12); color: var(--accent-fail); }
+
+        section { padding: 80px 0; }
+        section h2 { font-size: 2rem; font-weight: 700; margin-bottom: 48px; text-align: center; font-family: var(--font-mono); color: var(--accent); }
+
+        .hero-terminal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            margin: 40px auto;
+            max-width: 640px;
+            min-height: 330px;
+            text-align: left;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            overflow-x: auto;
+        }
+        .hero-terminal .prompt { color: var(--accent); }
+        .hero-terminal .output { color: var(--muted); }
+        .hero-terminal .highlight { color: var(--accent); }
+        .hero-terminal .warn { color: var(--accent-warn); }
+        .hero-terminal .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1em;
+            background: var(--accent);
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            transition: border-color .2s, transform .2s;
+        }
+        .feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .feature .icon { font-size: 2rem; margin-bottom: 16px; }
+        .feature h3 { font-size: 1.1rem; margin-bottom: 8px; color: var(--accent); font-family: var(--font-mono); }
+        .feature p { font-size: 0.9rem; color: var(--muted); }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 40px 20px 24px;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 16px 0;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .code-block .cmd { color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .code-block .copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 0;
+            transition: border-color .2s;
+        }
+        .code-block .copy-btn:hover { border-color: var(--accent); }
+        .code-block .copy-btn svg { width: 10px; height: 10px; display: block; }
+        .code-block .copy-btn .check { display: none; }
+        .code-block .copy-btn.copied .clip { display: none; }
+        .code-block .copy-btn.copied .check { display: block; }
+
+        .steps { counter-reset: step; max-width: 600px; margin: 0 auto; }
+        .step {
+            counter-increment: step;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            transition: border-color .2s;
+        }
+        .step:hover { border-color: var(--accent); }
+        .step::before {
+            content: counter(step);
+            background: var(--accent);
+            color: #000;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            font-family: var(--font-mono);
         }
-        .sidebar-header svg { width: 36px; height: 36px; flex-shrink: 0; }
-        .sidebar-header .title { font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; color: var(--accent); }
-        .sidebar-section {
-            padding: 8px 20px 4px;
-            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
-            color: var(--muted); font-family: var(--font-mono); font-weight: 600;
-        }
-        .sidebar a {
-            display: block; padding: 6px 20px; font-size: 0.85rem;
-            color: var(--muted); text-decoration: none; font-family: var(--font-mono);
-            border-left: 2px solid transparent; transition: all .15s;
-        }
-        .sidebar a:hover, .sidebar a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(57,255,136,0.04); }
-        .sidebar-footer {
-            padding: 20px 20px 0; margin-top: auto;
-            border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.75rem; color: #7C8791;
-        }
-        .sidebar-footer a { color: var(--accent); text-decoration: none; }
+        .step-content { flex: 1; min-width: 0; }
+        .step-content h3 { font-size: 1rem; margin-bottom: 4px; font-family: var(--font-mono); }
+        .step-content p { font-size: 0.9rem; color: var(--muted); }
 
-        /* Main content */
-        .content {
-            margin-left: var(--sidebar-w);
-            flex: 1; padding: 48px 56px; max-width: 900px;
+        .benchmarks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 32px; }
+        .benchmark-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            text-align: center;
+            transition: border-color .2s, transform .2s;
         }
-        .content h1 { font-family: var(--font-mono); font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
-        .content h1 span.nv { color: var(--text); }
-        .content h1 span.pr { color: var(--accent); }
-        .content .intro { color: var(--muted); font-size: 1rem; margin-bottom: 40px; max-width: 640px; }
-        .content h2 {
-            font-family: var(--font-mono); font-size: 1.3rem; color: var(--accent);
-            margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
-        }
-        .content h3 {
-            font-family: var(--font-mono); font-size: 1rem; color: var(--text);
-            margin: 28px 0 8px;
-        }
-        .content p { margin-bottom: 12px; font-size: 0.92rem; }
-        .content ul, .content ol { margin: 0 0 16px 20px; font-size: 0.92rem; }
-        .content li { margin-bottom: 4px; }
-        .content code {
-            font-family: var(--font-mono); font-size: 0.82rem;
-            background: var(--surface); padding: 2px 6px; border-radius: 4px;
-            color: var(--accent); border: 1px solid var(--border);
-        }
-        .content pre {
+        .benchmark-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .benchmark-card h3 { font-size: 1.1rem; font-family: var(--font-mono); }
+        .benchmark-card p { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+        .benchmark-card .tag { font-size: 0.75rem; display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 10px; background: var(--border); color: var(--accent); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+        .benchmark-card .tag-warning { background: rgba(255,176,32,0.12); color: var(--accent-warn); }
+
+        .cmds { max-width: 600px; margin: 32px auto 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .cmd-row {
+            display: flex; justify-content: space-between; align-items: center;
             background: var(--surface); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 16px 20px; overflow-x: auto;
-            margin: 12px 0 20px; font-size: 0.8rem; line-height: 1.6;
+            border-radius: var(--radius); padding: 12px 20px;
+            font-size: 0.85rem; font-family: var(--font-mono);
         }
-        .content pre code { background: none; border: none; padding: 0; color: var(--text); }
-        .content pre .kw { color: var(--accent); }
-        .content pre .cm { color: var(--muted); font-style: italic; }
-        .content table {
-            width: 100%; border-collapse: collapse; margin: 12px 0 20px;
-            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+        .cmd-row .cmd { color: var(--accent); font-variant-numeric: tabular-nums; }
+        .cmd-row .desc { color: var(--muted); font-family: var(--font-sans); font-size: 0.8rem; }
+
+        .faq { max-width: 680px; margin: 0 auto; }
+        .faq details {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 24px;
+            margin-bottom: 12px;
+            transition: border-color .2s;
         }
-        .content th {
-            background: var(--surface); color: var(--accent); padding: 8px 12px;
-            text-align: left; font-size: 0.8rem; font-family: var(--font-mono); font-weight: 600;
-            border-bottom: 1px solid var(--border);
+        .faq details[open] { border-color: var(--accent); }
+        .faq summary {
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            color: var(--text);
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .content td {
-            padding: 6px 12px; border-bottom: 1px solid var(--border);
-            font-size: 0.82rem; font-family: var(--font-mono);
+        .faq summary::-webkit-details-marker { display: none; }
+        .faq summary::after {
+            content: "+";
+            font-size: 1.3rem;
+            color: var(--accent);
+            transition: transform .2s;
         }
-        .content tr:last-child td { border-bottom: none; }
-        .note {
-            background: rgba(57,255,136,0.06); border-left: 3px solid var(--accent);
-            padding: 10px 16px; margin: 16px 0; border-radius: 0 var(--radius) var(--radius) 0;
-            font-size: 0.85rem; color: var(--muted);
+        .faq details[open] summary::after { content: "−"; }
+        .faq details p {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: var(--muted);
+            line-height: 1.7;
         }
-        .note strong { color: var(--accent); }
+        .faq details p code {
+            background: var(--border);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+        }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 40px 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        footer a { color: var(--accent); text-decoration: none; }
 
         @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .content { margin-left: 0; padding: 24px 16px; }
+            .badge { font-size: 0.7rem; padding: 3px 10px; }
+            .hero-terminal { font-size: 0.7rem; padding: 14px 16px; }
+        }
+        @media (max-width: 640px) {
+            header h1 { font-size: 2.4rem; }
+            header p { font-size: 1rem; }
+            nav a:not(.logo) { margin-left: 12px; font-size: 0.8rem; }
+            .features { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
+    <div class="container">
+        <nav role="navigation" aria-label="Main navigation">
+            <a href="#" class="logo" aria-label="nvprobe home">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="44" height="44" role="img" aria-label="nvprobe logo: stylized GPU probe icon with green waveform">
+                    <rect x="50" y="50" width="100" height="100" rx="12" fill="#14181B" stroke="#39FF88" stroke-width="4"/>
+                    <path d="M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15" stroke="#39FF88" stroke-width="4" stroke-linecap="round"/>
+                    <polyline points="65,110 85,110 100,75 115,120 135,95" fill="none" stroke="#39FF88" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" filter="url(#n)"/>
+                    <defs><filter id="n" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+                </svg>
+                <span>nvprobe</span>
+            </a>
+            <div>
+                <a href="https://pypi.org/project/nvprobe/" aria-label="nvprobe on PyPI">PyPI</a>
+                <a href="https://github.com/SergioZ3R0/nvprobe" aria-label="nvprobe on GitHub">GitHub</a>
+                <a href="/docs.html" aria-label="nvprobe documentation">Docs</a>
+            </div>
+        </nav>
 
-<nav class="sidebar" aria-label="Documentation navigation">
-    <div class="sidebar-header">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="36" height="36" role="img">
-            <rect x="50" y="50" width="100" height="100" rx="12" fill="#14181B" stroke="#39FF88" stroke-width="4"/>
-            <path d="M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15" stroke="#39FF88" stroke-width="4" stroke-linecap="round"/>
-            <polyline points="65,110 85,110 100,75 115,120 135,95" fill="none" stroke="#39FF88" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
-        </svg>
-        <span class="title">nvprobe</span>
+        <header role="banner">
+            <div class="logo-big">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="180" height="180" role="img" aria-label="nvprobe large logo: GPU probe icon on dark background">
+                    <rect width="200" height="200" rx="40" fill="#0B0E10"/>
+                    <rect x="50" y="50" width="100" height="100" rx="12" fill="#14181B" stroke="#39FF88" stroke-width="4"/>
+                    <path d="M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15" stroke="#39FF88" stroke-width="4" stroke-linecap="round"/>
+                    <polyline points="65,110 85,110 100,75 115,120 135,95" fill="none" stroke="#39FF88" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" filter="url(#g)"/>
+                    <defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+                </svg>
+            </div>
+            <h1>nv<span>probe</span></h1>
+            <p>
+                Baseline GPUs at delivery, run HPL &amp; HPCG, test VRAM integrity,
+                detect thermal throttling, benchmark MLPerf inference, and generate
+                interactive HTML reports — all from a single CLI.
+            </p>
+            <div class="badge-wrap">
+                <span class="badge badge-py">Python 3.10+</span>
+                <span class="badge badge-cuda">CUDA 12 / 13</span>
+                <span class="badge badge-hpc">HPL / HPCG</span>
+                <span class="badge badge-hpc">Memtest</span>
+                <span class="badge badge-ml">Burn</span>
+                <span class="badge badge-ml">MLPerf</span>
+            </div>
+            <div class="hero-terminal" aria-label="Live terminal output from nvprobe" id="hero-terminal">
+                <span id="terminal-text">$ nvprobe run --local<br>
+  [GPU 0] NVIDIA B200 &bull; fp32 &bull; bandwidth<br>
+  H2D 1024 MB: 198.4 GB/s<br>
+  D2H 1024 MB: 197.1 GB/s<br>
+  D2D 1024 MB: 512.8 GB/s<br>
+  Report generated: report.html</span><span class="cursor" id="terminal-cursor"></span>
+            </div>
+            <a href="https://pypi.org/project/nvprobe/" class="btn btn-primary">View on PyPI</a>
+            <a href="/docs.html" class="btn btn-outline">Documentation</a>
+            <a href="https://github.com/SergioZ3R0/nvprobe" class="btn btn-outline">View on GitHub</a>
+            <img src="nvprobe_example.gif" alt="nvprobe HTML Report Demo" style="width: 100%; max-width: 800px; border-radius: 8px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0, 255, 100, 0.1); display: block; margin: 3rem auto 0 auto;">
+        </header>
+
+        <main>
+            <section aria-labelledby="features-heading">
+                <h2 id="features-heading">Why nvProbe</h2>
+                <div class="features">
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="chart icon">📊</div>
+                        <h3>Pre-built Benchmarks</h3>
+                        <p>Memory bandwidth, matmul, attention, convolution — run standard CUDA workloads with zero setup.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="racing car icon">🏎️</div>
+                        <h3>HPL &amp; HPCG</h3>
+                        <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks — auto-downloaded on setup.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="brain icon">🧠</div>
+                        <h3>MLPerf Inference</h3>
+                        <p>End-to-end MLPerf via cmx4mlperf with configurable model, framework, and precision.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="chart with upwards trend icon">📈</div>
+                        <h3>Infrastructure Audits</h3>
+                        <p>Capture max clocks, power caps, ECC state, PCIe link speed &amp; NVLink — baseline today, re-run in 6 months, spot degradation instantly.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="graph icon">📊</div>
+                        <h3>Interactive Charts</h3>
+                        <p>Chart.js canvas-based charts with tooltip hover, zoom, and oscilloscope-style glow.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="package icon">📦</div>
+                        <h3>Bundled CUDA Runtime</h3>
+                        <p>No system CUDA toolkit required — CuPy with <code>[ctk]</code> bundles everything via pip.</p>
+                    </article>
+                    <article class="feature">
+                        <div class="icon" role="img" aria-label="desktop computer icon">🖥️</div>
+                        <h3>Slurm Integration</h3>
+                        <p>Generate, submit, monitor, and collect results from HPC clusters — all from a single CLI.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section aria-labelledby="quickstart-heading">
+                <h2 id="quickstart-heading">Quick Start</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-content">
+                            <h3>Install</h3>
+                            <div class="code-block">
+                                <span class="cmd">pip install nvprobe</span>
+                                <button class="copy-btn" onclick="copyCmd(this)" title="Copy command to clipboard">
+                                    <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#7C8791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39FF88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-content">
+                            <h3>Setup</h3>
+                            <p>Install CuPy, download HPL/HPCG binaries, generate configs</p>
+                            <div class="code-block">
+                                <span class="cmd">nvprobe setup</span>
+                                <button class="copy-btn" onclick="copyCmd(this)" title="Copy command to clipboard">
+                                    <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#7C8791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39FF88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-content">
+                            <h3>Check environment</h3>
+                            <p>Verify GPU detection, driver, and CUDA version</p>
+                            <div class="code-block">
+                                <span class="cmd">nvprobe env</span>
+                                <button class="copy-btn" onclick="copyCmd(this)" title="Copy command to clipboard">
+                                    <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#7C8791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39FF88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-content">
+                            <h3>Run benchmarks</h3>
+                            <div class="code-block">
+                                <span class="cmd">nvprobe run --local</span>
+                                <button class="copy-btn" onclick="copyCmd(this)" title="Copy command to clipboard">
+                                    <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#7C8791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39FF88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-content">
+                            <h3>Generate report</h3>
+                            <div class="code-block">
+                                <span class="cmd">nvprobe report --open</span>
+                                <button class="copy-btn" onclick="copyCmd(this)" title="Copy command to clipboard">
+                                    <svg class="clip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#7C8791" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <svg class="check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39FF88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 style="margin-top: 60px; font-size: 1.3rem;">More commands</h2>
+                <div class="cmds">
+                    <div class="cmd-row"><span class="cmd">nvprobe compare --a results/run1 --b results/run2</span><span class="desc">Compare runs</span></div>
+                    <div class="cmd-row"><span class="cmd">nvprobe run --config configs/cluster.yaml</span><span class="desc">Custom config</span></div>
+                    <div class="cmd-row"><span class="cmd">nvprobe slurm submit --config configs/cluster.yaml</span><span class="desc">Slurm submit</span></div>
+                    <div class="cmd-row"><span class="cmd">nvprobe setup --cuda 13</span><span class="desc">Specific CUDA</span></div>
+                </div>
+            </section>
+
+            <section aria-labelledby="benchmarks-heading">
+                <h2 id="benchmarks-heading">Benchmarks</h2>
+                <div class="benchmarks">
+                    <article class="benchmark-card">
+                        <h3>Bandwidth</h3>
+                        <p>H2D, D2H, D2D memory bandwidth across buffer sizes</p>
+                        <span class="tag">CuPy</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>Burn</h3>
+                        <p>Sustained MatMul burn with clock/temp tracking and throttling detection</p>
+                        <span class="tag">CuPy</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>Memtest</h3>
+                        <p>VRAM integrity: solid, checkerboard, random, walking-1 patterns</p>
+                        <span class="tag">CuPy</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>Custom Kernels</h3>
+                        <p>MatMul, tiled MatMul, fused attention, convolution</p>
+                        <span class="tag">CUDA C</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>HPL</h3>
+                        <p>High Performance Linpack (FP64)</p>
+                        <span class="tag">MPI</span>
+                        <span class="tag tag-warning">Datacenter GPUs</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>HPCG</h3>
+                        <p>Conjugate Gradients</p>
+                        <span class="tag">MPI</span>
+                        <span class="tag tag-warning">Datacenter GPUs</span>
+                    </article>
+                    <article class="benchmark-card">
+                        <h3>MLPerf</h3>
+                        <p>MLPerf Inference — test / find_performance / full</p>
+                        <span class="tag">ONNX Runtime</span>
+                    </article>
+                </div>
+            </section>
+
+            <section aria-labelledby="faq-heading">
+                <h2 id="faq-heading">FAQ</h2>
+                <div class="faq">
+                    <details>
+                        <summary>Can I run nvprobe on a workstation RTX GPU for HPL and HPCG benchmarks?</summary>
+                        <p>The NVIDIA HPC Benchmarks binaries (<code>xhpl</code> and <code>xhpch</code>) are validated for datacenter GPUs such as A100, H100, B200, and L40S. On RTX-series workstation cards the GPU initialization step may crash with a SIGSEGV. However, all other benchmarks — memory bandwidth, custom CUDA kernels (matmul, attention, convolution), and MLPerf inference — work on any CUDA-capable GPU. You can selectively disable HPL and HPCG in your YAML config and still run the full suite of bandwidth and custom kernel tests.</p>
+                    </details>
+                    <details>
+                        <summary>How does nvprobe handle MLPerf Inference setup and cuDNN detection?</summary>
+                        <p>nvprobe drives MLPerf Inference through <code>cmx4mlperf</code> (the MLCommons cm framework), supporting model, framework, scenario, and precision configuration. The <code>mlcr</code> tool discovers cuDNN through system CUDA library paths by default. If you installed cuDNN via <code>pip install nvidia-cudnn-cuXX</code>, pre-register the path manually: <code>mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')</code>. NVPROBE's <code>setup</code> command also installs CuPy with bundled CUDA libraries, so no system CUDA toolkit is required for the bandwidth and custom kernel benchmarks.</p>
+                    </details>
+                    <details>
+                        <summary>Does nvprobe support Slurm-based HPC clusters for multi-GPU benchmarking?</summary>
+                        <p>Yes, nvprobe has native Slurm integration. Use <code>nvprobe slurm submit --config configs/cluster.yaml</code> to generate job scripts, submit them to the specified Slurm partition, monitor their status with <code>nvprobe slurm status</code>, and automatically collect results once they complete. The YAML config lets you define <code>gpus_per_node</code>, partition name, and per-node benchmark parameters, making it suitable for large-scale HPC clusters with multiple GPU nodes running HPL, HPCG, or MLPerf in parallel.</p>
+                    </details>
+                </div>
+            </section>
+        </main>
+
+        <footer role="contentinfo">
+            <p>Apache 2.0 &middot; Built by <a href="https://github.com/SergioZ3R0">SergioZ3R0</a></p>
+        </footer>
     </div>
-    <div class="sidebar-section">Getting Started</div>
-    <a href="#intro">Overview</a>
-    <a href="#quickstart">Quickstart</a>
-    <div class="sidebar-section">Reference</div>
-    <a href="#config-bandwidth">bandwidth</a>
-    <a href="#config-memtest">memtest</a>
-    <a href="#config-burn">burn</a>
-    <a href="#config-custom">custom</a>
-    <a href="#config-hpl">hpl</a>
-    <a href="#config-hpcg">hpcg</a>
-    <a href="#config-mlperf">mlperf</a>
-    <div class="sidebar-section">Guides</div>
-    <a href="#example-configs">Example Configs</a>
-    <a href="#how-benchmarks-work">How Benchmarks Work</a>
-    <a href="#slurm-quickstart">Slurm Quickstart</a>
-    <a href="#environment">Environment Diagnostics</a>
-    <div class="sidebar-footer">
-        <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a><br>
-        <a href="https://github.com/SergioZ3R0/nvprobe">GitHub</a>
-    </div>
-</nav>
 
-<main class="content">
-
-<h1 id="intro"><span class="nv">nv</span><span class="pr">probe</span> Documentation</h1>
-<p class="intro">
-    nvprobe runs its own optimized CUDA workloads via CuPy and cuBLAS — no external model files,
-    no PyTorch/TensorFlow wrappers. Every benchmark is self-contained.
-    Install, configure, and get GPU performance numbers in minutes.
-</p>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="quickstart">Quickstart</h2>
-<pre><code>pip install nvprobe
-nvprobe setup -f
-nvprobe run --local
-nvprobe report
-</code></pre>
-
-<p>The <code>run --local</code> command reads <code>nvprobe/configs/local.yaml</code> by default.
-Generated reports land in <code>nvprobe/reports/</code>.</p>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="config-reference">Config Reference</h2>
-<p>Every benchmark in a YAML config supports its own <code>params</code> block.
-Below are all recognized parameters per benchmark.</p>
-
-<h3 id="config-bandwidth">bandwidth</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>sizes_mb</code></td><td>list[int]</td><td><code>[1, 4, 16, 64, 256, 1024]</code></td><td>Buffer sizes in MB for H2D / D2H / D2D transfers</td></tr>
-    <tr><td><code>iterations</code></td><td>int</td><td><code>100</code></td><td>Measurement iterations per size (higher = more stable)</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> bandwidth
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256, 1024, 4096</span>]
-<span class="kw">    iterations:</span> 100
-</code></pre>
-
-<h3 id="config-memtest">memtest</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>sizes_mb</code></td><td>list[int]</td><td><code>[1024]</code></td><td>VRAM segment to test (MB per run). Actual size capped at 85 % free memory.</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> memtest
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    sizes_mb:</span> [<span class="cm">1024, 4096</span>]
-</code></pre>
-<p>Runs 7 patterns: solid 0x00 / 0xFF, checkerboard 0xAA / 0x55, pseudo-random, walking‑1 high/low.
-Reports total errors per pattern.</p>
-
-<h3 id="config-burn">burn</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>duration_sec</code></td><td>int</td><td><code>30</code></td><td>Sustained load duration in seconds</td></tr>
-    <tr><td><code>matrix_size</code></td><td>int</td><td><code>8192</code></td><td>Square matrix dimension (N) for cuBLAS SGEMM</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> burn
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    duration_sec:</span> 60
-<span class="kw">    matrix_size:</span> 16384
-</code></pre>
-<p>Samples SM/MEM clocks, temperature, and power every second.
-Throttling is flagged if the SM clock drops &gt;15 % from its initial value.</p>
-
-<h3 id="config-custom">custom</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>kernels</code></td><td>list[str]</td><td><code>[matmul, attention]</code></td><td>Kernels to run: <code>matmul</code>, <code>tiled_matmul</code>, <code>attention</code>, <code>conv2d</code></td></tr>
-    <tr><td><code>matrix_sizes</code></td><td>list[int]</td><td><code>[512, 1024, 2048]</code></td><td>Problem sizes (N for N×N, or seq_len for attention)</td></tr>
-    <tr><td><code>iterations</code></td><td>int</td><td><code>50</code></td><td>Measurement iterations per kernel per size</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> custom
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    kernels:</span> [<span class="cm">matmul, tiled_matmul, attention, conv2d</span>]
-<span class="kw">    matrix_sizes:</span> [<span class="cm">512, 1024, 2048, 4096</span>]
-<span class="kw">    iterations:</span> 50
-</code></pre>
-<div class="note"><strong>Requires CuPy [ctk] extras.</strong> Without CUDA toolkit headers, custom kernels fall back with an allocation error. Install with <code>pip install cupy-cuda12x[ctk]</code>.</div>
-
-<h3 id="config-hpl">hpl</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>problem_sizes</code></td><td>list[int]</td><td><code>[4096, 8192]</code></td><td>HPL matrix sizes N. Auto-calculated from GPU memory if empty.</td></tr>
-    <tr><td><code>binary</code></td><td>str</td><td><code>~/.nvprobe/tools/xhpl</code></td><td>Path to xhpl binary</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> hpl
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    problem_sizes:</span> [<span class="cm">4096, 8192, 16384</span>]
-<span class="kw">    binary:</span> <span class="cm">"~/.nvprobe/tools/xhpl"</span>
-</code></pre>
-<div class="note"><strong>Datacenter GPUs only</strong> (A100, H100, B200, L40S). RTX cards may crash (SIGSEGV).
-On Blackwell GPUs ensure OpenMPI &ge; 5.x — older MPI versions may segfault.</div>
-
-<h3 id="config-hpcg">hpcg</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>grid_sizes</code></td><td>list[int]</td><td><code>[128, 256]</code></td><td>3D grid sizes (uniform n<sub>x</sub> = n<sub>y</sub> = n<sub>z</sub>)</td></tr>
-    <tr><td><code>binary</code></td><td>str</td><td><code>~/.nvprobe/tools/xhpcg</code></td><td>Path to xhpcg binary</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> hpcg
-<span class="kw">  enabled:</span> true
-<span class="kw">  params:</span>
-<span class="kw">    grid_sizes:</span> [<span class="cm">128, 256, 512</span>]
-<span class="kw">    binary:</span> <span class="cm">"~/.nvprobe/tools/xhpcg"</span>
-</code></pre>
-<div class="note"><strong>Same GPU / MPI constraints as HPL.</strong></div>
-
-<h3 id="config-mlperf">mlperf</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td><code>model</code></td><td>str</td><td><code>resnet50</code></td><td>MLPerf model name</td></tr>
-    <tr><td><code>framework</code></td><td>str</td><td><code>onnxruntime</code></td><td>Inference framework</td></tr>
-    <tr><td><code>scenario</code></td><td>str</td><td><code>Offline</code></td><td>MLPerf scenario</td></tr>
-    <tr><td><code>category</code></td><td>str</td><td><code>edge</code></td><td><code>edge</code> or <code>datacenter</code></td></tr>
-    <tr><td><code>implementation</code></td><td>str</td><td><code>reference</code></td><td>MLPerf implementation</td></tr>
-    <tr><td><code>test_query_count</code></td><td>int</td><td><code>100</code></td><td>Number of queries for test mode</td></tr>
-    <tr><td><code>mode</code></td><td>str</td><td><code>test</code></td><td><code>test</code>, <code>find_performance</code>, or <code>full</code></td></tr>
-    <tr><td><code>batch_size</code></td><td>int</td><td>—</td><td>Optional custom batch size override</td></tr>
-</table>
-<pre><code class="language-yaml"><span class="kw">- name:</span> mlperf
-<span class="kw">  enabled:</span> false  <span class="cm"># requires: pip install cmx4mlperf</span>
-<span class="kw">  params:</span>
-<span class="kw">    model:</span> resnet50
-<span class="kw">    framework:</span> onnxruntime
-<span class="kw">    scenario:</span> Offline
-<span class="kw">    category:</span> edge
-<span class="kw">    implementation:</span> reference
-<span class="kw">    test_query_count:</span> 100
-</code></pre>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="example-configs">Example Configs</h2>
-
-<h3>Local workstation</h3>
-<pre><code class="language-yaml"><span class="kw">name:</span> workstation
-<span class="kw">precisions:</span> [<span class="cm">fp32, fp16</span>]
-<span class="kw">batch_sizes:</span> [<span class="cm">1, 32, 64</span>]
-<span class="kw">benchmarks:</span>
-<span class="kw">  - name:</span> bandwidth
-<span class="kw">    params:</span>
-<span class="kw">      sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256</span>]
-<span class="kw">      iterations:</span> 50
-<span class="kw">  - name:</span> memtest
-<span class="kw">  - name:</span> burn
-<span class="kw">    params:</span>
-<span class="kw">      duration_sec:</span> 30
-</code></pre>
-
-<h3>Infrastructure audit only</h3>
-<pre><code class="language-yaml"><span class="kw">name:</span> node-audit
-<span class="kw">gpu:</span>
-<span class="kw">  min_count:</span> 1
-<span class="kw">benchmarks:</span>
-<span class="kw">  - name:</span> memtest
-<span class="kw">    params:</span>
-<span class="kw">      sizes_mb:</span> [<span class="cm">4096, 16384</span>]
-<span class="kw">  - name:</span> burn
-<span class="kw">    params:</span>
-<span class="kw">      duration_sec:</span> 60
-<span class="kw">      matrix_size:</span> 16384
-<span class="kw">  - name:</span> bandwidth
-<span class="kw">    params:</span>
-<span class="kw">      sizes_mb:</span> [<span class="cm">256, 1024, 4096</span>]
-<span class="kw">      iterations:</span> 100
-</code></pre>
-
-<h3>HPC cluster (Slurm)</h3>
-<pre><code class="language-yaml"><span class="kw">name:</span> cluster-suite
-<span class="kw">slurm:</span>
-<span class="kw">  enabled:</span> true
-<span class="kw">  partition:</span> gpu
-<span class="kw">  nodes:</span> 4
-<span class="kw">  gpus_per_node:</span> 8
-<span class="kw">  time_limit:</span> <span class="cm">"02:00:00"</span>
-<span class="kw">precisions:</span> [<span class="cm">fp32, fp16</span>]
-<span class="kw">batch_sizes:</span> [<span class="cm">1, 32, 64, 128, 256</span>]
-<span class="kw">benchmarks:</span>
-<span class="kw">  - name:</span> bandwidth
-<span class="kw">    params:</span>
-<span class="kw">      sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256, 1024, 4096</span>]
-<span class="kw">      iterations:</span> 100
-<span class="kw">  - name:</span> memtest
-<span class="kw">    params:</span>
-<span class="kw">      sizes_mb:</span> [<span class="cm">4096, 16384</span>]
-<span class="kw">  - name:</span> burn
-<span class="kw">    params:</span>
-<span class="kw">      duration_sec:</span> 60
-<span class="kw">      matrix_size:</span> 16384
-<span class="kw">  - name:</span> hpl
-<span class="kw">    params:</span>
-<span class="kw">      problem_sizes:</span> [<span class="cm">4096, 8192, 16384, 32768</span>]
-<span class="kw">  - name:</span> hpcg
-<span class="kw">    params:</span>
-<span class="kw">      grid_sizes:</span> [<span class="cm">128, 256, 512</span>]
-</code></pre>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="how-benchmarks-work">How Benchmarks Work</h2>
-
-<p>
-Each benchmark runs as an <strong>independent subprocess</strong> launched via
-<code>sys.executable -m nvprobe.benchmarks._cuda.&lt;name&gt;</code>.
-Output is captured as JSON, parsed, and stored in the local SQLite database.
-</p>
-
-<ul>
-    <li><strong>bandwidth, memtest, burn</strong> — use CuPy + NumPy.
-        No CUDA toolkit required.</li>
-    <li><strong>custom</strong> — requires CuPy with <code>[ctk]</code> extras
-        (CUDA toolkit headers for JIT kernel compilation).</li>
-    <li><strong>hpl, hpcg</strong> — call NVIDIA HPC Benchmarks binaries
-        (<code>xhpl</code> / <code>xhpch</code>) via MPI.</li>
-    <li><strong>mlperf</strong> — drives <code>cmx4mlperf</code>
-        (the MLCommons cm framework).</li>
-</ul>
-
-<div class="note">
-    <strong>nvprobe is not a PyTorch/TensorFlow wrapper.</strong>
-    It does not run user-provided model scripts or datasets.
-    Benchmarks are self-contained CUDA workloads optimized for hardware validation.
-</div>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="slurm-quickstart">Slurm Quickstart</h2>
-
-<h3>1. Prepare a config</h3>
-<p>Use the <em>HPC cluster</em> example above or generate one:</p>
-<pre><code>nvprobe init -f
-nvprobe run --config nvprobe/configs/default.yaml --dry-run
-</code></pre>
-
-<h3>2. Submit to Slurm</h3>
-<pre><code>nvprobe slurm --config nvprobe/configs/default.yaml --action full
-</code></pre>
-
-<p>This single command:</p>
-<ol>
-    <li><strong>Generates</strong> one sbatch script per node.</li>
-    <li><strong>Submits</strong> all scripts.</li>
-    <li><strong>Monitors</strong> job progress (polls every 30 s).</li>
-    <li><strong>Collects &amp; merges</strong> per-node databases into a single <code>benchmarks.db</code>.</li>
-</ol>
-
-<h3>3. Generate the report</h3>
-<pre><code>nvprobe report --results nvprobe/results
-</code></pre>
-
-<p>Each node writes its own database (<code>node_0/benchmarks.db</code>,
-<code>node_1/benchmarks.db</code>, …). GPUs are re-indexed globally and
-hostnames are appended to model names in the merged environment table.</p>
-
-<div class="note">
-    <strong>Per-node, not per-benchmark.</strong>
-    One Slurm job runs <em>all</em> benchmarks on all GPUs of a single node.
-    This keeps scheduler overhead low and captures a clean per-node fingerprint.
-</div>
-
-<!-- ─────────────────────────────────────────────────────────────── -->
-
-<h2 id="environment">Environment Diagnostics</h2>
-
-<p>
-Every run captures a full environment fingerprint stored as JSON alongside
-the benchmark results. The HTML report shows these fields in the Environment table:
-</p>
-
-<table>
-    <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
-    <tr><td>GPU model</td><td>nvidia-smi</td><td>Hostname appended in Slurm merged reports</td></tr>
-    <tr><td>Memory total</td><td>nvidia-smi</td><td>MiB</td></tr>
-    <tr><td>SM Clock (max)</td><td><code>clocks.max.sm</code></td><td>Hardware ceiling — detects degraded silicon</td></tr>
-    <tr><td>Mem Clock (max)</td><td><code>clocks.max.mem</code></td><td>Hardware ceiling</td></tr>
-    <tr><td>Power Limit</td><td><code>power.limit</code></td><td>Watts — N/A on WDDM (Windows)</td></tr>
-    <tr><td>ECC mode</td><td><code>ecc.mode.current</code></td><td>Enabled / Disabled / N/A</td></tr>
-    <tr><td>ECC errors</td><td><code>ecc.errors.corrected / uncorrected</code></td><td>Cumulative volatile counts</td></tr>
-    <tr><td>PCIe link (max)</td><td><code>pcie.link.gen.max</code> × <code>pcie.link.width.max</code></td><td>Maximum negotiated link speed</td></tr>
-    <tr><td>NVLink active links</td><td><code>nvlink.active.links</code> + fallback <code>nvlink -s</code></td><td>B200 / NVSwitch compatible</td></tr>
-    <tr><td>Driver / CUDA</td><td>nvidia-smi banner</td><td>Also shown in overview cards</td></tr>
-</table>
-
-<div class="note">
-    <strong>Baseline today, re-run in 6 months.</strong>
-    If the max SM clock dropped or an NVLink link went inactive, the report
-    makes the regression instantly attributable. No guesswork.
-</div>
-
-</main>
-
-<script>
-(function() {
-    var links = document.querySelectorAll('.sidebar a');
-    var headings = document.querySelectorAll('.content h2, .content h3');
-    function setActive() {
-        var id = '';
-        for (var i = headings.length-1; i >= 0; i--) {
-            if (headings[i].getBoundingClientRect().top < 120) { id = headings[i].id; break; }
+    <script>
+        function copyCmd(btn) {
+            const cmd = btn.parentElement.querySelector('.cmd').textContent;
+            navigator.clipboard.writeText(cmd).then(() => {
+                btn.classList.add('copied');
+                setTimeout(() => btn.classList.remove('copied'), 1500);
+            });
         }
-        links.forEach(function(l) {
-            l.classList.toggle('active', l.getAttribute('href') === '#' + id);
-        });
-    }
-    window.addEventListener('scroll', setActive);
-    setActive();
-})();
-</script>
 
+        (function typeTerminal() {
+            var el = document.getElementById('terminal-text');
+            var cursor = document.getElementById('terminal-cursor');
+            if (!el) return;
+
+            var lines = [
+                [{t:'prompt',v:'$ '},{t:'highlight',v:'nvprobe'},{t:'output',v:' run --local'}],
+                [{t:'output',v:'  '},{t:'highlight',v:'[GPU 0]'},{t:'output',v:' NVIDIA B200 \u2022 fp32 \u2022 bandwidth'}],
+                [{t:'output',v:'  H2D 1024 MB:'},{t:'highlight',v:' 198.4 GB/s'}],
+                [{t:'output',v:'  D2H 1024 MB:'},{t:'highlight',v:' 197.1 GB/s'}],
+                [{t:'output',v:'  D2D 1024 MB:'},{t:'highlight',v:' 512.8 GB/s'}],
+                [{t:'output',v:'  '},{t:'highlight',v:'[GPU 0]'},{t:'output',v:' NVIDIA B200 \u2022 fp32 \u2022 matmul'}],
+                [{t:'output',v:'  8192\u00d78192:'},{t:'highlight',v:' 142.3 TFLOPS'}],
+                [{t:'output',v:'  '},{t:'highlight',v:'[GPU 0]'},{t:'output',v:' NVIDIA B200 \u2022 HPL'}],
+                [{t:'output',v:'  N=100000:'},{t:'highlight',v:' 58.2 TFLOPS'}],
+                [{t:'output',v:'  '},{t:'highlight',v:'[GPU 0]'},{t:'output',v:' NVIDIA B200 \u2022 MLPerf resnet50'}],
+                [{t:'output',v:'  throughput:'},{t:'highlight',v:' 830.4 qps'},{t:'output',v:'  accuracy:'},{t:'highlight',v:' 80.0%'}],
+                [{t:'prompt',v:'$ '},{t:'highlight',v:'nvprobe'},{t:'output',v:' report --open'}],
+                [{t:'output',v:'  Report generated:'},{t:'highlight',v:' report.html'}],
+            ];
+
+            var lineIdx = 0, spanIdx = 0, charIdx = 0;
+            var typedLines = [];
+
+            function renderAll() {
+                var html = '';
+                for (var i = 0; i < typedLines.length; i++) {
+                    html += typedLines[i] + '<br>';
+                }
+                el.innerHTML = html;
+            }
+
+            function typeNext() {
+                if (lineIdx >= lines.length) {
+                    cursor.style.display = 'inline-block';
+                    return;
+                }
+                var spans = lines[lineIdx];
+
+                if (spanIdx >= spans.length) {
+                    typedLines.push(spans.map(function(s) { return '<span class="' + s.t + '">' + s.v + '</span>'; }).join(''));
+                    lineIdx++;
+                    spanIdx = 0;
+                    charIdx = 0;
+                    renderAll();
+                    setTimeout(typeNext, 150);
+                    return;
+                }
+
+                var s = spans[spanIdx];
+                if (charIdx >= s.v.length) {
+                    spanIdx++;
+                    charIdx = 0;
+                    renderAll();
+                    setTimeout(typeNext, 40);
+                    return;
+                }
+
+                var partial = s.v.substring(0, charIdx + 1);
+                var lineHTML = '';
+                for (var j = 0; j < spans.length; j++) {
+                    var text = (j < spanIdx) ? spans[j].v : (j === spanIdx ? partial : '');
+                    var cls = spans[j].t;
+                    if (text) lineHTML += '<span class="' + cls + '">' + text + '</span>';
+                }
+
+                var fullHTML = '';
+                for (var k = 0; k < typedLines.length; k++) fullHTML += typedLines[k] + '<br>';
+                fullHTML += lineHTML;
+                el.innerHTML = fullHTML;
+
+                charIdx++;
+                var ch = s.v[charIdx - 1];
+                var delay = (ch === ' ' || ch === '\u2022') ? 20 : Math.random() * 35 + 20;
+                setTimeout(typeNext, delay);
+            }
+
+            cursor.style.display = 'none';
+            typeNext();
+        })();
+    </script>
 </body>
 </html>

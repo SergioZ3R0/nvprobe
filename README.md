@@ -17,7 +17,7 @@
 </p>
 
 <div align="center">
-  <img src="nvprobe_example.gif" alt="nvprobe interactive report demo" width="800">
+  <img src="https://nvprobe.scszero.com/nvprobe_example.gif" alt="nvprobe interactive report demo" width="800">
 </div>
 
 ```bash
