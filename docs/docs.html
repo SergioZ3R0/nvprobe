@@ -156,6 +156,7 @@
     <a href="#quickstart">Quickstart</a>
     <div class="sidebar-section">Reference</div>
     <a href="#config-bandwidth">bandwidth</a>
+    <a href="#config-stream">stream</a>
     <a href="#config-memtest">memtest</a>
     <a href="#config-burn">burn</a>
     <a href="#config-custom">custom</a>
@@ -212,6 +213,22 @@ Below are all recognized parameters per benchmark.</p>
 <span class="kw">    sizes_mb:</span> [<span class="cm">1, 4, 16, 64, 256, 1024, 4096</span>]
 <span class="kw">    iterations:</span> 100
 </code></pre>
+
+<h3 id="config-stream">stream</h3>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>sizes</code></td><td>list[int]</td><td><code>[10000000, 100000000]</code></td><td>Array element counts for STREAM operations</td></tr>
+    <tr><td><code>iterations</code></td><td>int</td><td><code>20</code></td><td>Measurement iterations per size (higher = more stable)</td></tr>
+</table>
+<pre><code class="language-yaml"><span class="kw">- name:</span> stream
+<span class="kw">  enabled:</span> true
+<span class="kw">  params:</span>
+<span class="kw">    sizes:</span> [<span class="cm">10000000, 100000000, 1000000000</span>]
+<span class="kw">    iterations:</span> 20
+</code></pre>
+<p>STREAM benchmark (John D. McCalpin) measuring sustainable memory bandwidth via four operations:
+COPY (<code>a[i] = b[i]</code>), SCALE (<code>a[i] = q * b[i]</code>), ADD (<code>a[i] = b[i] + c[i]</code>),
+and TRIAD (<code>a[i] = b[i] + q * c[i]</code>). Reports bandwidth in GB/s with mean/min/max/std statistics.</p>
 
 <h3 id="config-memtest">memtest</h3>
 <table>

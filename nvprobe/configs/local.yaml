@@ -24,6 +24,12 @@ benchmarks:
       sizes_mb: [1, 4, 16, 64, 256]
       iterations: 50
 
+  - name: stream
+    enabled: true
+    params:
+      sizes: [10000000, 100000000]
+      iterations: 10
+
   - name: memtest
     enabled: true
     params:
