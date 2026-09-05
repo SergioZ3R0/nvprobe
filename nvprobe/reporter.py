@@ -305,6 +305,138 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
 {filter_script}"""
 
 
+def _chart_stream(results: list[dict[str, Any]]) -> str:
+    """STREAM benchmark bar chart with GPU + Operation type dropdowns."""
+    grouped: dict[str, dict] = {}
+    for r in results:
+        metrics = _parse_metrics(r.get("metrics", "{}"))
+        key = f"GPU {r['gpu_index']} ({r['gpu_model']})"
+        if "copy" in metrics:
+            grouped[key] = metrics
+
+    if not grouped:
+        return ""
+
+    gpu_names = list(grouped.keys())
+    sizes = list(next(iter(grouped.values())).get("copy", {}).keys())
+    n_sizes = len(sizes)
+    if n_sizes == 0:
+        return ""
+
+    op_types = [
+        ("copy", "COPY"),
+        ("scale", "SCALE"),
+        ("add", "ADD"),
+        ("triad", "TRIAD"),
+    ]
+
+    datasets = []
+    trace_info: list[list[int | str]] = []
+    for i, (gpu, data) in enumerate(grouped.items()):
+        for op, label in op_types:
+            vals = [_extract_val(v, "mean") for v in data.get(op, {}).values()]
+            if not vals:
+                continue
+            color = SERIES_COLORS[i % len(SERIES_COLORS)]
+            datasets.append(
+                {
+                    "label": f"{gpu} {label}",
+                    "data": vals,
+                    "backgroundColor": color + "99",
+                    "borderColor": color,
+                    "borderWidth": 1,
+                    "borderRadius": 2,
+                    "hidden": op != "copy",
+                    "gpu_idx": i,
+                    "op": op,
+                }
+            )
+            trace_info.append([i, op])
+
+    chart_id = "ch-stream"
+    datasets_json = json.dumps(datasets)
+
+    filter_script = f"""
+<script>
+(function() {{
+  var chartInstance = null;
+  var streamData = {datasets_json};
+
+  function renderStream(filterGpu, filterOp) {{
+    var ds = streamData.map(function(d) {{
+      var show = true;
+      if (filterGpu !== -1 && d.gpu_idx !== filterGpu) show = false;
+      if (filterOp && d.op !== filterOp) show = false;
+      return Object.assign({{}}, d, {{hidden: !show}});
+    }});
+    var ctx = document.getElementById('{chart_id}');
+    if (!ctx || !window.Chart) return;
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx.getContext('2d'), {{
+      type: 'bar',
+      data: {{
+        labels: {json.dumps(sizes)},
+        datasets: ds,
+      }},
+      options: Object.assign({{}}, {json.dumps(_chart_default_opts())}, {{
+        plugins: {{
+          legend: {{ labels: {{ color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}}, boxWidth: 14, padding: 14 }} }},
+          tooltip: {{
+            enabled: true,
+            backgroundColor: '{SURFACE}',
+            titleFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 12}},
+            bodyFont: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 11}},
+            borderColor: '{BORDER}',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 6,
+            titleColor: '{TEXT}',
+            bodyColor: '{TEXT}',
+            callbacks: {{
+              label: function(ctx) {{ return ctx.parsed.y.toFixed(1) + ' GB/s'; }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{ stacked: false, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+          y: {{ beginAtZero: true, grid: {{color: 'rgba(255,255,255,0.04)'}}, ticks: {{color: '{MUTED}', font: {{family: 'IBM Plex Mono, JetBrains Mono, Fira Code, monospace', size: 10}}}} }},
+        }},
+      }})
+    }});
+  }}
+
+  renderStream(-1, 'copy');
+  window.streamFilterGpu = function(idx) {{ renderStream(idx, document.getElementById('stream-op').value); }};
+  window.streamFilterOp = function(op) {{ renderStream(parseInt(document.getElementById('stream-gpu').value), op); }};
+}})();
+</script>"""
+
+    gpu_opts = "".join(
+        f'<option value="{i}">GPU {i}</option>' for i in range(len(gpu_names))
+    )
+    op_opts = "".join(
+        f'<option value="{op}" {"selected" if op == "copy" else ""}>{label}</option>'
+        for op, label in op_types
+    )
+
+    return f"""<details class="chart" open>
+<summary>STREAM — Sustainable Memory Bandwidth</summary>
+<div class="chart-toolbar">
+  <label>GPU: <select id="stream-gpu" onchange="streamFilterGpu(parseInt(this.value))">
+    <option value="-1">All GPUs</option>
+    {gpu_opts}
+  </select></label>
+  <label>Operation: <select id="stream-op" onchange="streamFilterOp(this.value)">
+    {op_opts}
+  </select></label>
+</div>
+<div class="chart-inner">
+  <canvas id="{chart_id}"></canvas>
+</div>
+</details>
+{filter_script}"""
+
+
 def _chart_line_with_filters(
     results: list[dict[str, Any]],
     benchmark_key: str,
@@ -1154,6 +1286,7 @@ def generate_report(
     for name, func in [
         ("summary", _chart_summary),
         ("bandwidth", _chart_bandwidth),
+        ("stream", _chart_stream),
         ("burn", _chart_burn),
         ("memtest", _chart_memtest),
         ("matmul", _chart_matmul),
@@ -1293,6 +1426,7 @@ def _render_html(
     _CHART_NAMES = [
         ("summary", "Summary Dashboard"),
         ("bandwidth", "Memory Bandwidth"),
+        ("stream", "STREAM — Sustainable Memory Bandwidth"),
         ("burn", "Burn — Clock Stability"),
         ("memtest", "Memtest — VRAM Integrity"),
         ("matmul", "Matrix Multiplication"),

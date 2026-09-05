@@ -7,6 +7,7 @@ from nvprobe.benchmarks.hpcg import HpcgBenchmark
 from nvprobe.benchmarks.hpl import HplBenchmark
 from nvprobe.benchmarks.memtest import MemtestBenchmark
 from nvprobe.benchmarks.mlperf import MlperfBenchmark
+from nvprobe.benchmarks.stream import StreamBenchmark
 
 BENCHMARK_REGISTRY: dict[str, type] = {
     "bandwidth": BandwidthBenchmark,
@@ -16,6 +17,7 @@ BENCHMARK_REGISTRY: dict[str, type] = {
     "hpcg": HpcgBenchmark,
     "memtest": MemtestBenchmark,
     "mlperf": MlperfBenchmark,
+    "stream": StreamBenchmark,
 }
 
 __all__ = [
@@ -27,4 +29,5 @@ __all__ = [
     "HplBenchmark",
     "MemtestBenchmark",
     "MlperfBenchmark",
+    "StreamBenchmark",
 ]
