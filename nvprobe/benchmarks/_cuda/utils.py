@@ -11,6 +11,7 @@ def require_cupy():
     """Import cupy or exit with installation instructions."""
     try:
         import cupy as cp
+
         return cp
     except ImportError:
         print(

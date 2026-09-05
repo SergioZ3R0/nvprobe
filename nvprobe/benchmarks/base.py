@@ -19,6 +19,7 @@ def _find_cupy_cuda_libs() -> list[str]:
     dirs: list[str] = []
     try:
         import importlib.metadata
+
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"]
             if name.startswith("cupy-cuda"):
@@ -28,7 +29,9 @@ def _find_cupy_cuda_libs() -> list[str]:
                 except Exception:
                     loc = dist._path.parent
                 # [ctk] installs libs under cupy_cudaXXX.libs/
-                for pattern in glob.glob(str(loc / f"{name.replace('-', '_')}.libs" / "*")):
+                for pattern in glob.glob(
+                    str(loc / f"{name.replace('-', '_')}.libs" / "*")
+                ):
                     d = os.path.dirname(pattern)
                     if d not in dirs:
                         dirs.append(d)
@@ -116,6 +119,7 @@ def _find_nvidia_pip_lib(pip_prefix: str, subpath: str) -> list[str]:
     dirs: list[str] = []
     try:
         import importlib.metadata
+
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"] or ""
             if name.startswith(pip_prefix):
@@ -139,6 +143,7 @@ def _find_nvidia_pip_root(pip_prefix: str, subpath: str) -> str | None:
     """
     try:
         import importlib.metadata
+
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"] or ""
             if name.startswith(pip_prefix):
@@ -311,6 +316,7 @@ def _find_cudnn_root() -> str | None:
     roots: list[tuple[int, str]] = []
     try:
         import importlib.metadata
+
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"] or ""
             if name.startswith("nvidia-cudnn-cu"):
@@ -353,7 +359,6 @@ def _ensure_pip_package(pip_name: str) -> bool:
     successfully.  Returns ``False`` on any failure (no network, no
     permissions, etc.) — *never raises*.
     """
-    import sys
 
     if not pip_name or not pip_name.strip():
         return False
@@ -361,6 +366,7 @@ def _ensure_pip_package(pip_name: str) -> bool:
     # Check if already installed via importlib.metadata
     try:
         import importlib.metadata
+
         for dist in importlib.metadata.distributions():
             name = dist.metadata["Name"] or ""
             if name.replace("-", "_") == pip_name.replace("-", "_"):
@@ -371,7 +377,8 @@ def _ensure_pip_package(pip_name: str) -> bool:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--user", pip_name],
-            capture_output=True, timeout=120,
+            capture_output=True,
+            timeout=120,
         )
         return result.returncode == 0
     except Exception:
@@ -389,9 +396,16 @@ def _detect_gpu_model(gpu_index: int) -> str:
     """
     try:
         proc = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader",
-             "-i", str(gpu_index)],
-            capture_output=True, text=True, timeout=5,
+            [
+                "nvidia-smi",
+                "--query-gpu=name",
+                "--format=csv,noheader",
+                "-i",
+                str(gpu_index),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if proc.returncode == 0:
             return proc.stdout.strip()
@@ -399,6 +413,7 @@ def _detect_gpu_model(gpu_index: int) -> str:
         pass
     try:
         import cupy as cp
+
         props = cp.cuda.runtime.getDeviceProperties(gpu_index)
         name = props.get("name", b"unknown")
         if isinstance(name, bytes):
@@ -413,7 +428,10 @@ def _guess_cuda_major() -> str:
     """Roughly detect CUDA major version for diagnostic messages."""
     try:
         out = subprocess.run(
-            ["nvcc", "--version"], capture_output=True, text=True, timeout=5,
+            ["nvcc", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         for line in out.stdout.splitlines():
             if "release" in line:
@@ -424,7 +442,9 @@ def _guess_cuda_major() -> str:
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         ver = out.stdout.strip()
         if ver:
@@ -611,14 +631,20 @@ class BaseBenchmark(ABC):
         self.params = params
 
     @abstractmethod
-    def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
+    def run_local(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> BenchmarkResult:
         """Run the benchmark locally on a specific GPU. Returns result."""
 
     @abstractmethod
-    def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+    def build_slurm_script(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> str:
         """Return sbatch script content for this benchmark."""
 
-    def parse_slurm_output(self, output: str, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
+    def parse_slurm_output(
+        self, output: str, gpu_index: int, precision: str, batch_size: int
+    ) -> BenchmarkResult:
         """Parse Slurm job output into a BenchmarkResult. Override for custom parsing."""
         return BenchmarkResult(
             benchmark=self.name,

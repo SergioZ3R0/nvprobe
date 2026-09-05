@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -23,18 +22,29 @@ console = Console()
 @app.command()
 def run(
     config: Path = typer.Option(
-        Path("nvprobe/configs/local.yaml"), "--config", "-c",
+        Path("nvprobe/configs/local.yaml"),
+        "--config",
+        "-c",
         help="YAML config file defining the test matrix.",
-        dir_okay=False, readable=True,
+        dir_okay=False,
+        readable=True,
     ),
     output: Path = typer.Option(
-        Path("nvprobe/results"), "--output", "-o", help="Directory for raw results (JSON/CSV).",
+        Path("nvprobe/results"),
+        "--output",
+        "-o",
+        help="Directory for raw results (JSON/CSV).",
     ),
     local: bool = typer.Option(
-        False, "--local", "-l", help="Run locally on this machine (no Slurm).",
+        False,
+        "--local",
+        "-l",
+        help="Run locally on this machine (no Slurm).",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would run without executing.",
+        False,
+        "--dry-run",
+        help="Show what would run without executing.",
     ),
 ) -> None:
     """Run benchmarks defined in a config file."""
@@ -42,7 +52,9 @@ def run(
 
     if not config.exists():
         console.print(f"[red]Config file not found:[/red] {config}")
-        console.print("Run [bold]nvprobe init[/bold] to generate default configs, or specify a custom config with --config.")
+        console.print(
+            "Run [bold]nvprobe init[/bold] to generate default configs, or specify a custom config with --config."
+        )
         raise typer.Exit(1)
 
     console.print(f"[bold green]nvprobe v{__version__}[/bold green]")
@@ -58,16 +70,27 @@ def run(
 @app.command()
 def report(
     results: Path = typer.Option(
-        Path("nvprobe/results"), "--results", "-r", help="Directory containing benchmark results.",
+        Path("nvprobe/results"),
+        "--results",
+        "-r",
+        help="Directory containing benchmark results.",
     ),
     output: Path = typer.Option(
-        Path("nvprobe/reports"), "--output", "-o", help="Directory for generated HTML reports.",
+        Path("nvprobe/reports"),
+        "--output",
+        "-o",
+        help="Directory for generated HTML reports.",
     ),
-    title: Optional[str] = typer.Option(
-        None, "--title", "-t", help="Report title.",
+    title: str | None = typer.Option(
+        None,
+        "--title",
+        "-t",
+        help="Report title.",
     ),
-    run_id: Optional[int] = typer.Option(
-        None, "--run-id", help="Generate report for a specific run (default: latest).",
+    run_id: int | None = typer.Option(
+        None,
+        "--run-id",
+        help="Generate report for a specific run (default: latest).",
     ),
 ) -> None:
     """Generate an HTML report from benchmark results."""
@@ -80,22 +103,36 @@ def report(
 @app.command()
 def compare(
     results_a: Path = typer.Option(
-        None, "--a", help="First result set directory (baseline).",
+        None,
+        "--a",
+        help="First result set directory (baseline).",
     ),
     results_b: Path = typer.Option(
-        None, "--b", help="Second result set directory (comparison).",
+        None,
+        "--b",
+        help="Second result set directory (comparison).",
     ),
-    a_run: Optional[int] = typer.Option(
-        None, "--a-run", help="Run ID for baseline (uses same DB as --b-run).",
+    a_run: int | None = typer.Option(
+        None,
+        "--a-run",
+        help="Run ID for baseline (uses same DB as --b-run).",
     ),
-    b_run: Optional[int] = typer.Option(
-        None, "--b-run", help="Run ID for comparison (uses same DB as --a-run).",
+    b_run: int | None = typer.Option(
+        None,
+        "--b-run",
+        help="Run ID for comparison (uses same DB as --a-run).",
     ),
     results: Path = typer.Option(
-        Path("nvprobe/results"), "--results", "-r", help="Results directory for same-DB comparison.",
+        Path("nvprobe/results"),
+        "--results",
+        "-r",
+        help="Results directory for same-DB comparison.",
     ),
     output: Path = typer.Option(
-        Path("nvprobe/reports"), "--output", "-o", help="Directory for comparison report.",
+        Path("nvprobe/reports"),
+        "--output",
+        "-o",
+        help="Directory for comparison report.",
     ),
 ) -> None:
     """Compare two result sets side-by-side.
@@ -106,8 +143,12 @@ def compare(
     from nvprobe.reporter import generate_comparison
 
     if a_run is not None and b_run is not None:
-        console.print(f"[bold green]Comparing run {a_run} vs run {b_run} in {results}[/bold green]")
-        generate_comparison(None, None, output, db_path=results, run_id_a=a_run, run_id_b=b_run)
+        console.print(
+            f"[bold green]Comparing run {a_run} vs run {b_run} in {results}[/bold green]"
+        )
+        generate_comparison(
+            None, None, output, db_path=results, run_id_a=a_run, run_id_b=b_run
+        )
     elif results_a is None or results_b is None:
         console.print("[red]Either --a/--b or --a-run/--b-run must be provided[/red]")
         raise typer.Exit(1)
@@ -119,11 +160,15 @@ def compare(
 @app.command()
 def list(
     results: Path = typer.Option(
-        Path("nvprobe/results"), "--results", "-r", help="Results directory.",
+        Path("nvprobe/results"),
+        "--results",
+        "-r",
+        help="Results directory.",
     ),
 ) -> None:
     """List all stored benchmark runs."""
     import json
+
     from nvprobe.db import Database
 
     db_path = results / "benchmarks.db"
@@ -152,6 +197,7 @@ def list(
                 f"{r['created_at'][:19]:19s}  {gpu_count} GPU(s)"
             )
 
+
 @app.command()
 def env() -> None:
     """Show detected GPU environment (driver, CUDA, GPUs)."""
@@ -172,6 +218,7 @@ def version() -> None:
 # Core logic (called by both standalone commands and `setup`)
 # ---------------------------------------------------------------------------
 
+
 def _do_init(force: bool = False) -> None:
     """Generate default config files under nvprobe/ working directory."""
     import shutil as _shutil
@@ -181,7 +228,9 @@ def _do_init(force: bool = False) -> None:
     dest = base / "configs"
 
     if dest.exists() and not force:
-        console.print(f"[yellow]nvprobe/configs/ already exists. Use --force to overwrite.[/yellow]")
+        console.print(
+            "[yellow]nvprobe/configs/ already exists. Use --force to overwrite.[/yellow]"
+        )
         return
 
     dest.mkdir(parents=True, exist_ok=True)
@@ -210,11 +259,15 @@ def _detect_cuda_major() -> str | None:
     """Detect CUDA major version via nvcc or nvidia-smi."""
     import shutil
     import subprocess
+
     nvcc = shutil.which("nvcc")
     if nvcc:
         try:
             out = subprocess.run(
-                [nvcc, "--version"], capture_output=True, text=True, check=True,
+                [nvcc, "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
             )
             for line in out.stdout.splitlines():
                 if "release" in line:
@@ -226,7 +279,9 @@ def _detect_cuda_major() -> str | None:
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         ver = out.stdout.strip()
         if ver:
@@ -247,12 +302,16 @@ def _detect_mpi_variant() -> str:
     import os
     import shutil
     import subprocess
+
     for mpi_name in ("mpirun", "srun"):
         mpi_bin = shutil.which(mpi_name)
         if mpi_bin:
             try:
                 out = subprocess.run(
-                    [mpi_bin, "--version"], capture_output=True, text=True, timeout=5,
+                    [mpi_bin, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 combined = (out.stdout + out.stderr).lower()
                 if "open mpi" in combined or "openmpi" in combined:
@@ -267,12 +326,13 @@ def _detect_mpi_variant() -> str:
     return "mpich"
 
 
-def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_variant: str | None = None) -> None:
+def _do_setup_tools(
+    force: bool = False, cuda_version: str | None = None, mpi_variant: str | None = None
+) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     import os
     import platform
     import shutil
-    import subprocess
     import tarfile
     import tempfile
     import urllib.request
@@ -298,12 +358,14 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
     )
 
     benchmarks = {
-        "HPL":  ("hpl-linux-{arch}/xhpl", "xhpl"),
+        "HPL": ("hpl-linux-{arch}/xhpl", "xhpl"),
         "HPCG": ("hpcg-linux-{arch}/xhpcg", "xhpcg"),
     }
 
     def _build_internal_path(cuda_dir: str, template: str) -> str:
-        prefix = f"nvidia_hpc_benchmarks_{mpi_variant}-linux-{arch}-{nvidia_version}-archive"
+        prefix = (
+            f"nvidia_hpc_benchmarks_{mpi_variant}-linux-{arch}-{nvidia_version}-archive"
+        )
         return f"{prefix}/{cuda_dir}/{template.format(arch=arch)}"
 
     for label, (internal_path, final_name) in benchmarks.items():
@@ -341,7 +403,9 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
                 cuda_dirs.sort(reverse=True)  # prefer newest
 
                 if not cuda_dirs:
-                    console.print("  [yellow]No CUDA variants found in tarball[/yellow]")
+                    console.print(
+                        "  [yellow]No CUDA variants found in tarball[/yellow]"
+                    )
                     return
 
                 # Pick the best CUDA variant: prefer exact match, then fallback
@@ -366,9 +430,13 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
                         member.name = final_name
                         tar.extract(member, path=str(tools_dir))
                         (tools_dir / final_name).chmod(0o755)
-                        console.print(f"  [green]{label}: {tools_dir / final_name}[/green]")
+                        console.print(
+                            f"  [green]{label}: {tools_dir / final_name}[/green]"
+                        )
                     except KeyError:
-                        console.print(f"  [yellow]{label} binary not found in tarball ({internal_path})[/yellow]")
+                        console.print(
+                            f"  [yellow]{label} binary not found in tarball ({internal_path})[/yellow]"
+                        )
     except Exception as exc:
         console.print(f"  [yellow]Download failed: {exc}[/yellow]")
         if "404" in str(exc) or "HTTP Error" in str(exc):
@@ -393,30 +461,36 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
 
     # --- Step: Auto-install NCCL (best-effort) ---
     nccl_pkg = f"nvidia-nccl-cu{cuda_version}"
-    console.print(f"\n[bold]Step: NCCL runtime library[/bold]")
+    console.print("\n[bold]Step: NCCL runtime library[/bold]")
     if _ensure_pip_package(nccl_pkg):
         console.print(f"  [green]{nccl_pkg} ready[/green]")
     else:
         console.print(f"  [yellow]Could not install {nccl_pkg}[/yellow]")
-        console.print(f"  [dim]To install manually: pip install --user {nccl_pkg}[/dim]")
+        console.print(
+            f"  [dim]To install manually: pip install --user {nccl_pkg}[/dim]"
+        )
 
     # --- Step: Auto-install cuDNN (best-effort) ---
     cudnn_pkg = f"nvidia-cudnn-cu{cuda_version}"
-    console.print(f"\n[bold]Step: cuDNN runtime library[/bold]")
+    console.print("\n[bold]Step: cuDNN runtime library[/bold]")
     if _ensure_pip_package(cudnn_pkg):
         console.print(f"  [green]{cudnn_pkg} ready[/green]")
     else:
         console.print(f"  [yellow]Could not install {cudnn_pkg}[/yellow]")
-        console.print(f"  [dim]To install manually: pip install --user {cudnn_pkg}[/dim]")
+        console.print(
+            f"  [dim]To install manually: pip install --user {cudnn_pkg}[/dim]"
+        )
 
     # --- Step: Auto-install NVSHMEM (best-effort) ---
     nvshmem_pkg = f"nvidia-nvshmem-cu{cuda_version}"
-    console.print(f"\n[bold]Step: NVSHMEM runtime library[/bold]")
+    console.print("\n[bold]Step: NVSHMEM runtime library[/bold]")
     if _ensure_pip_package(nvshmem_pkg):
         console.print(f"  [green]{nvshmem_pkg} ready[/green]")
     else:
         console.print(f"  [yellow]Could not install {nvshmem_pkg}[/yellow]")
-        console.print(f"  [dim]To install manually: pip install --user {nvshmem_pkg}[/dim]")
+        console.print(
+            f"  [dim]To install manually: pip install --user {nvshmem_pkg}[/dim]"
+        )
 
     path_add = str(tools_dir)
     console.print(f"\n[bold]Tools installed to: {tools_dir}[/bold]")
@@ -429,9 +503,12 @@ def _do_setup_tools(force: bool = False, cuda_version: str | None = None, mpi_va
 # CLI commands
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def init(
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing configs."),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Overwrite existing configs."
+    ),
 ) -> None:
     """Generate default config files in the current directory."""
     _do_init(force=force)
@@ -439,7 +516,9 @@ def init(
 
 @app.command()
 def setup_tools(
-    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already installed."),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Re-download even if already installed."
+    ),
 ) -> None:
     """Download and install HPL, HPCG, MLPerf locally to ~/.nvprobe/tools/."""
     _do_setup_tools(force=force)  # cuda_version auto-detected inside
@@ -462,11 +541,16 @@ def setup(
     if nvcc:
         try:
             out = subprocess.run(
-                [nvcc, "--version"], capture_output=True, text=True, check=True,
+                [nvcc, "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
             )
             for line in out.stdout.splitlines():
                 if "release" in line:
-                    cuda_ver = line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                    cuda_ver = (
+                        line.split("release")[-1].strip().rstrip(",").split(",")[0]
+                    )
                     break
         except Exception:
             pass
@@ -475,13 +559,19 @@ def setup(
         try:
             subprocess.run(
                 ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             console.print("  [yellow]nvcc not found (nvidia-smi present)[/yellow]")
-            console.print("  [dim]Install CUDA toolkit for automatic cupy detection[/dim]")
+            console.print(
+                "  [dim]Install CUDA toolkit for automatic cupy detection[/dim]"
+            )
         except Exception:
             console.print("  [yellow]No CUDA detected. Skipping cupy install.[/yellow]")
-            console.print("  [dim]Install CUDA toolkit, then run: nvprobe setup-tools[/dim]")
+            console.print(
+                "  [dim]Install CUDA toolkit, then run: nvprobe setup-tools[/dim]"
+            )
             return
 
     if cuda_ver:
@@ -495,6 +585,7 @@ def setup(
         found_cupy_packages: list[str] = []
         try:
             import importlib.metadata
+
             for dist in importlib.metadata.distributions():
                 name = dist.metadata["Name"]
                 if name and name.startswith("cupy-cuda"):
@@ -502,7 +593,9 @@ def setup(
                     if name == cupy_pkg:
                         cupy_ok = True
                     else:
-                        console.print(f"  [yellow]CUDA version mismatch! {name} vs needed {cupy_pkg}[/yellow]")
+                        console.print(
+                            f"  [yellow]CUDA version mismatch! {name} vs needed {cupy_pkg}[/yellow]"
+                        )
             if len(found_cupy_packages) > 1:
                 console.print(
                     f"  [yellow]Multiple cupy-cuda packages detected: {', '.join(found_cupy_packages)}. "
@@ -516,6 +609,7 @@ def setup(
         if not cupy_ok:
             try:
                 import cupy  # noqa: F401
+
                 cupy_ok = True
             except ImportError:
                 pass
@@ -526,7 +620,14 @@ def setup(
             console.print(f"  Installing {cupy_pkg}[ctk]...")
             try:
                 subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--user", f"{cupy_pkg}[ctk]"],
+                    [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "--user",
+                        f"{cupy_pkg}[ctk]",
+                    ],
                     check=True,
                 )
                 console.print(f"  [green]{cupy_pkg}[ctk] installed[/green]")
@@ -545,14 +646,24 @@ def setup(
 @app.command(name="slurm")
 def slurm_cmd(
     config: Path = typer.Option(
-        ..., "--config", "-c", help="YAML config file.",
-        exists=True, dir_okay=False, readable=True,
+        ...,
+        "--config",
+        "-c",
+        help="YAML config file.",
+        exists=True,
+        dir_okay=False,
+        readable=True,
     ),
     output: Path = typer.Option(
-        Path("nvprobe/results"), "--output", "-o", help="Output directory.",
+        Path("nvprobe/results"),
+        "--output",
+        "-o",
+        help="Output directory.",
     ),
     action: str = typer.Option(
-        "generate", "--action", "-a",
+        "generate",
+        "--action",
+        "-a",
         help="Action: generate, submit, monitor, collect, or full (all steps).",
     ),
 ) -> None:
@@ -582,7 +693,9 @@ def slurm_cmd(
 @app.command(name="config")
 def config_validate(
     config: Path = typer.Option(
-        Path("nvprobe/configs/local.yaml"), "--config", "-c",
+        Path("nvprobe/configs/local.yaml"),
+        "--config",
+        "-c",
         help="YAML config file to validate.",
     ),
 ) -> None:
@@ -600,8 +713,12 @@ def config_validate(
         console.print(f"  Name:        {cfg.name}")
         console.print(f"  Precisions:  {', '.join(cfg.precisions)}")
         console.print(f"  Batch sizes: {', '.join(str(b) for b in cfg.batch_sizes)}")
-        console.print(f"  Benchmarks:  {', '.join(benchmarks) if benchmarks else 'none'}")
-        console.print(f"  Slurm:       {'enabled' if cfg.slurm.enabled else 'disabled'}")
+        console.print(
+            f"  Benchmarks:  {', '.join(benchmarks) if benchmarks else 'none'}"
+        )
+        console.print(
+            f"  Slurm:       {'enabled' if cfg.slurm.enabled else 'disabled'}"
+        )
     except Exception as exc:
         console.print(f"[red]Config invalid:[/red] {exc}")
         raise typer.Exit(1)

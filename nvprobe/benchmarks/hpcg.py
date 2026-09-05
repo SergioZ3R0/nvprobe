@@ -8,9 +8,13 @@ import subprocess
 from pathlib import Path
 
 from nvprobe.benchmarks.base import (
-    BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
-    _build_env, _detect_gpu_model, _diagnose_missing_lib,
-    _find_mpi_run, subprocess_env,
+    KNOWN_MISSING_LIBS,
+    BaseBenchmark,
+    BenchmarkResult,
+    _build_env,
+    _detect_gpu_model,
+    _diagnose_missing_lib,
+    _find_mpi_run,
 )
 
 # Heuristic: bytes per grid point for HPCG GPU memory (CSR matrix + vectors + workspace).
@@ -35,7 +39,9 @@ def _get_available_host_memory() -> int | None:
                 if "memory" in line and ":" in line:
                     cgroup_path = line.split(":")[2].strip()
                     if cgroup_path:
-                        mem_limit = f"/sys/fs/cgroup/memory{cgroup_path}/memory.limit_in_bytes"
+                        mem_limit = (
+                            f"/sys/fs/cgroup/memory{cgroup_path}/memory.limit_in_bytes"
+                        )
                         if os.path.exists(mem_limit):
                             with open(mem_limit) as mf:
                                 val = int(mf.read().strip())
@@ -60,6 +66,7 @@ def _get_available_host_memory() -> int | None:
         pass
     try:
         import psutil
+
         return psutil.virtual_memory().available
     except ImportError:
         pass
@@ -77,6 +84,7 @@ def _get_available_gpu_memory(gpu_index: int) -> int | None:
     """Return available GPU memory in bytes for the given device, or None if unknown."""
     try:
         import cupy as cp  # fmt: skip
+
         cp.cuda.Device(gpu_index).use()
         free, _ = cp.cuda.runtime.memGetInfo()
         return free
@@ -91,7 +99,7 @@ def _estimate_hpcg_memory(grid_size: int) -> tuple[int, int]:
     The estimate uses conservative per-point heuristics and a 1.5× safety
     margin is applied by the caller.
     """
-    n = grid_size ** 3
+    n = grid_size**3
     return n * _HPCG_GPU_BYTES_PER_POINT, n * _HPCG_HOST_BYTES_PER_POINT
 
 
@@ -102,13 +110,13 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
     which resource is insufficient.
     """
     gpu_need, host_need = _estimate_hpcg_memory(grid_size)
-    gpu_need_mb = gpu_need / 1024 ** 2
-    host_need_mb = host_need / 1024 ** 2
+    gpu_need_mb = gpu_need / 1024**2
+    host_need_mb = host_need / 1024**2
 
     # GPU memory check (best-effort, only if cupy is available)
     free_gpu = _get_available_gpu_memory(gpu_index)
     if free_gpu is not None and free_gpu < gpu_need * 1.5:
-        free_gpu_mb = free_gpu / 1024 ** 2
+        free_gpu_mb = free_gpu / 1024**2
         return False, (
             f"grid_size={grid_size} requires ~{gpu_need_mb:.0f} MB of GPU memory, "
             f"only {free_gpu_mb:.0f} MB free — skipping to avoid OOM"
@@ -117,7 +125,7 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
     # Host memory check (best-effort)
     free_host = _get_available_host_memory()
     if free_host is not None and free_host < host_need * 1.5:
-        free_host_mb = free_host / 1024 ** 2
+        free_host_mb = free_host / 1024**2
         return False, (
             f"grid_size={grid_size} requires ~{host_need_mb:.0f} MB of host RAM, "
             f"only {free_host_mb:.0f} MB available — skipping to avoid OOM-kill"
@@ -127,38 +135,67 @@ def _check_hpcg_memory(grid_size: int, gpu_index: int) -> tuple[bool, str]:
 
 
 def _run_hpcg_size(
-    binary: str, size: int, mpi_run: str | None,
-    env: dict[str, str], gpu_index: int, precision: str, batch_size: int,
+    binary: str,
+    size: int,
+    mpi_run: str | None,
+    env: dict[str, str],
+    gpu_index: int,
+    precision: str,
+    batch_size: int,
     gpu_model: str = "unknown",
 ) -> BenchmarkResult | None:
     try:
         rt_seconds = 60
         if mpi_run:
-            cmd = [mpi_run, "--mca", "pmix", "isolated", "-np", "1", binary,
-                   f"--nx={size}", f"--ny={size}", f"--nz={size}",
-                   f"--rt={rt_seconds}"]
+            cmd = [
+                mpi_run,
+                "--mca",
+                "pmix",
+                "isolated",
+                "-np",
+                "1",
+                binary,
+                f"--nx={size}",
+                f"--ny={size}",
+                f"--nz={size}",
+                f"--rt={rt_seconds}",
+            ]
         else:
-            cmd = [binary,
-                   f"--nx={size}", f"--ny={size}", f"--nz={size}",
-                   f"--rt={rt_seconds}"]
+            cmd = [
+                binary,
+                f"--nx={size}",
+                f"--ny={size}",
+                f"--nz={size}",
+                f"--rt={rt_seconds}",
+            ]
             env["OMPI_MCA_pmix"] = "isolated"
         print(f"    $ {' '.join(cmd)}")
 
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=3600, check=True,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            check=True,
             env=env,
         )
         gflops = _parse_hpcg_output(proc.stdout)
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
+            benchmark="hpcg",
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
             metrics={"gflops": gflops, "grid_size": size, "run_time": rt_seconds},
             raw_output=proc.stdout,
         )
     except FileNotFoundError:
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
+            benchmark="hpcg",
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
             success=False,
             error="MPI binary not found. Install OpenMPI or MPICH.",
         )
@@ -170,22 +207,28 @@ def _run_hpcg_size(
         # Exit code 137 = SIGKILL, almost always OOM
         if isinstance(exc, subprocess.CalledProcessError) and exc.returncode == 137:
             return BenchmarkResult(
-                benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark="hpcg",
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error=f"possible OOM (process killed with SIGKILL, exit code 137)\n"
-                      f"grid_size={size} exhausted available memory.\n"
-                      f"This may be caused by a Slurm cgroup memory limit. "
-                      f"Try a smaller grid_size or request more memory with --mem.\n"
-                      f"{detail}",
+                f"grid_size={size} exhausted available memory.\n"
+                f"This may be caused by a Slurm cgroup memory limit. "
+                f"Try a smaller grid_size or request more memory with --mem.\n"
+                f"{detail}",
             )
 
         # SIGSEGV during GPU init — known limitation on workstation GPUs
         rc = getattr(exc, "returncode", 0)
         if rc == -11 or rc == 139:
             return BenchmarkResult(
-                benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark="hpcg",
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error=(
                     "xhpcg crashed with a segmentation fault during GPU initialization, "
@@ -202,9 +245,13 @@ def _run_hpcg_size(
                     detail = _diagnose_missing_lib(lib, detail)
                     break
         return BenchmarkResult(
-            benchmark="hpcg", gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
-            success=False, error=f"{exc}\n{detail}".strip(),
+            benchmark="hpcg",
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
+            success=False,
+            error=f"{exc}\n{detail}".strip(),
         )
 
 
@@ -215,7 +262,9 @@ class HpcgBenchmark(BaseBenchmark):
     uses_precision_batch = False
     size_keys = ["grid_sizes"]
 
-    def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
+    def run_local(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> BenchmarkResult:
         binary = self.params.get("binary", "xhpcg")
         binary_path = Path(binary).expanduser()
         grid_sizes = self.params.get("grid_sizes", [128])
@@ -223,8 +272,11 @@ class HpcgBenchmark(BaseBenchmark):
 
         if not shutil.which(str(binary_path)) and not binary_path.is_file():
             return BenchmarkResult(
-                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark=self.name,
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error=f"HPCG binary '{binary}' not found. Run 'nvprobe setup-tools' or install xhpcg.",
             )
@@ -239,29 +291,55 @@ class HpcgBenchmark(BaseBenchmark):
             if not ok:
                 if last_result is None:
                     last_result = BenchmarkResult(
-                        benchmark=self.name, gpu_model=gpu_model,
-                        gpu_index=gpu_index, precision=precision,
-                        batch_size=batch_size, success=False,
+                        benchmark=self.name,
+                        gpu_model=gpu_model,
+                        gpu_index=gpu_index,
+                        precision=precision,
+                        batch_size=batch_size,
+                        success=False,
                         error=f"all grid sizes skipped — {reason}",
                     )
                 continue
 
-            result = _run_hpcg_size(binary_str, size, mpi_run, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
+            result = _run_hpcg_size(
+                binary_str,
+                size,
+                mpi_run,
+                env,
+                gpu_index,
+                precision,
+                batch_size,
+                gpu_model=gpu_model,
+            )
             if result is None or result.success:
                 last_result = result or last_result
                 if result and not result.success:
                     break
                 continue
             if mpi_run and ("opal_pmix" in result.error or "orte" in result.error):
-                result2 = _run_hpcg_size(binary_str, size, None, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
+                result2 = _run_hpcg_size(
+                    binary_str,
+                    size,
+                    None,
+                    env,
+                    gpu_index,
+                    precision,
+                    batch_size,
+                    gpu_model=gpu_model,
+                )
                 if result2:
                     if not result2.success and not result.success:
                         result2 = BenchmarkResult(
-                            benchmark=self.name, gpu_model=result2.gpu_model,
-                            gpu_index=gpu_index, precision=precision, batch_size=batch_size,
+                            benchmark=self.name,
+                            gpu_model=result2.gpu_model,
+                            gpu_index=gpu_index,
+                            precision=precision,
+                            batch_size=batch_size,
                             success=False,
-                            error="attempt with mpirun:\n" + result.error
-                                  + "\n\nattempt singleton:\n" + result2.error,
+                            error="attempt with mpirun:\n"
+                            + result.error
+                            + "\n\nattempt singleton:\n"
+                            + result2.error,
                         )
                     last_result = result2
                     if not last_result.success:
@@ -273,19 +351,25 @@ class HpcgBenchmark(BaseBenchmark):
                 break
 
         return last_result or BenchmarkResult(
-            benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
-            success=False, error="No grid sizes configured",
+            benchmark=self.name,
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
+            success=False,
+            error="No grid sizes configured",
         )
 
-    def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+    def build_slurm_script(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> str:
         binary = self.params.get("binary", "xhpcg")
         binary_path = Path(binary).expanduser()
         grid_sizes = self.params.get("grid_sizes", [128])
 
         return f"""export CUDA_VISIBLE_DEVICES={gpu_index}
 
-for GS in {' '.join(str(s) for s in grid_sizes)}; do
+for GS in {" ".join(str(s) for s in grid_sizes)}; do
     mpirun --mca pmix isolated -np 1 {binary_path} --nx=$GS --ny=$GS --nz=$GS --rt=60
 done
 """

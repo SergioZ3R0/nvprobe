@@ -9,18 +9,29 @@ import tempfile
 from pathlib import Path
 
 from nvprobe.benchmarks.base import (
-    BaseBenchmark, BenchmarkResult, KNOWN_MISSING_LIBS,
-    _build_env, _detect_gpu_model, _diagnose_missing_lib,
-    _find_mpi_run, subprocess_env,
+    KNOWN_MISSING_LIBS,
+    BaseBenchmark,
+    BenchmarkResult,
+    _build_env,
+    _detect_gpu_model,
+    _diagnose_missing_lib,
+    _find_mpi_run,
 )
 
 
 def _get_gpu_memory_mb(gpu_index: int) -> int | None:
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits",
-             "-i", str(gpu_index)],
-            capture_output=True, text=True, timeout=10,
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.total",
+                "--format=csv,noheader,nounits",
+                "-i",
+                str(gpu_index),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             return int(result.stdout.strip())
@@ -76,8 +87,13 @@ def _generate_hpl_dat(n: int, nb: int = 1024, p: int = 1, q: int = 1) -> str:
 
 
 def _run_hpl_size(
-    binary: str, n: int, mpi_run: str | None,
-    env: dict[str, str], gpu_index: int, precision: str, batch_size: int,
+    binary: str,
+    n: int,
+    mpi_run: str | None,
+    env: dict[str, str],
+    gpu_index: int,
+    precision: str,
+    batch_size: int,
     gpu_model: str = "unknown",
 ) -> BenchmarkResult | None:
     try:
@@ -94,20 +110,31 @@ def _run_hpl_size(
             print(f"    $ {' '.join(cmd)}")
 
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=3600, check=True,
-                env=env, cwd=tmpdir,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=3600,
+                check=True,
+                env=env,
+                cwd=tmpdir,
             )
             gflops = _parse_hpl_output(proc.stdout)
             return BenchmarkResult(
-                benchmark="hpl", gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark="hpl",
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 metrics={"gflops": gflops, "problem_size": n},
                 raw_output=proc.stdout,
             )
     except FileNotFoundError:
         return BenchmarkResult(
-            benchmark="hpl", gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
+            benchmark="hpl",
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
             success=False,
             error="MPI binary not found. Install OpenMPI or MPICH.",
         )
@@ -120,8 +147,11 @@ def _run_hpl_size(
         rc = getattr(exc, "returncode", 0)
         if rc == -11 or rc == 139:
             return BenchmarkResult(
-                benchmark="hpl", gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark="hpl",
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error=(
                     "xhpl crashed with a segmentation fault during GPU initialization, "
@@ -138,9 +168,13 @@ def _run_hpl_size(
                     detail = _diagnose_missing_lib(lib, detail)
                     break
         return BenchmarkResult(
-            benchmark="hpl", gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
-            success=False, error=f"{exc}\n{detail}".strip(),
+            benchmark="hpl",
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
+            success=False,
+            error=f"{exc}\n{detail}".strip(),
         )
 
 
@@ -151,7 +185,9 @@ class HplBenchmark(BaseBenchmark):
     uses_precision_batch = False
     size_keys = ["problem_sizes"]
 
-    def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
+    def run_local(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> BenchmarkResult:
         binary = self.params.get("binary", "xhpl")
         binary_path = Path(binary).expanduser()
         problem_sizes = self.params.get("problem_sizes", [])
@@ -163,8 +199,11 @@ class HplBenchmark(BaseBenchmark):
 
         if not shutil.which(str(binary_path)) and not binary_path.is_file():
             return BenchmarkResult(
-                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark=self.name,
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error=f"HPL binary '{binary}' not found. Run 'nvprobe setup-tools' or install xhpl.",
             )
@@ -175,22 +214,45 @@ class HplBenchmark(BaseBenchmark):
         binary_str = str(binary_path)
 
         for n in problem_sizes:
-            result = _run_hpl_size(binary_str, n, mpi_run, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
+            result = _run_hpl_size(
+                binary_str,
+                n,
+                mpi_run,
+                env,
+                gpu_index,
+                precision,
+                batch_size,
+                gpu_model=gpu_model,
+            )
             if result is None or result.success:
                 last_result = result or last_result
                 if result and not result.success:
                     break
                 continue
             if mpi_run and ("opal_pmix" in result.error or "orte" in result.error):
-                result2 = _run_hpl_size(binary_str, n, None, env, gpu_index, precision, batch_size, gpu_model=gpu_model)
+                result2 = _run_hpl_size(
+                    binary_str,
+                    n,
+                    None,
+                    env,
+                    gpu_index,
+                    precision,
+                    batch_size,
+                    gpu_model=gpu_model,
+                )
                 if result2:
                     if not result2.success and not result.success:
                         result2 = BenchmarkResult(
-                            benchmark=self.name, gpu_model=result2.gpu_model,
-                            gpu_index=gpu_index, precision=precision, batch_size=batch_size,
+                            benchmark=self.name,
+                            gpu_model=result2.gpu_model,
+                            gpu_index=gpu_index,
+                            precision=precision,
+                            batch_size=batch_size,
                             success=False,
-                            error="attempt with mpirun:\n" + result.error
-                                  + "\n\nattempt singleton:\n" + result2.error,
+                            error="attempt with mpirun:\n"
+                            + result.error
+                            + "\n\nattempt singleton:\n"
+                            + result2.error,
                         )
                     last_result = result2
                     if not last_result.success:
@@ -202,12 +264,18 @@ class HplBenchmark(BaseBenchmark):
                 break
 
         return last_result or BenchmarkResult(
-            benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-            precision=precision, batch_size=batch_size,
-            success=False, error="No problem sizes configured",
+            benchmark=self.name,
+            gpu_model=gpu_model,
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
+            success=False,
+            error="No problem sizes configured",
         )
 
-    def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+    def build_slurm_script(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> str:
         binary = self.params.get("binary", "xhpl")
         binary_path = Path(binary).expanduser()
         problem_sizes = self.params.get("problem_sizes", [])

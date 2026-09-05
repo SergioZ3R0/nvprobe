@@ -10,8 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from nvprobe.benchmarks.base import (
-    BaseBenchmark, BenchmarkResult, _detect_gpu_model, _ensure_pip_package,
-    _find_cudnn_root, subprocess_env,
+    BaseBenchmark,
+    BenchmarkResult,
+    _detect_gpu_model,
+    _ensure_pip_package,
+    _find_cudnn_root,
+    subprocess_env,
 )
 
 _CUDNN_REGISTERED_SENTINEL = os.path.join(
@@ -67,7 +71,9 @@ def _register_cudnn_once(mlperf_cmd: str, cudnn_root: str) -> None:
     try:
         subprocess.run(
             [mlperf_cmd, "get,cudnn,nvidia", f"--input={cudnn_root}"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
     except Exception:
         pass
@@ -85,7 +91,9 @@ def _clear_mlc_cuda_cache(mlperf_cmd: str) -> None:
     try:
         subprocess.run(
             [mlperf_cmd, "rm", "cache", "--tags=get,cuda", "-f"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except Exception:
         pass
@@ -97,7 +105,10 @@ def _detect_cuda_major() -> int | None:
     if nvcc:
         try:
             out = subprocess.run(
-                [nvcc, "--version"], capture_output=True, text=True, check=True,
+                [nvcc, "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
             )
             for line in out.stdout.splitlines():
                 if "release" in line:
@@ -108,7 +119,9 @@ def _detect_cuda_major() -> int | None:
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         parts = out.stdout.strip().split(".")
         if parts:
@@ -253,7 +266,9 @@ class MlperfBenchmark(BaseBenchmark):
 
         return base
 
-    def run_local(self, gpu_index: int, precision: str, batch_size: int) -> BenchmarkResult:
+    def run_local(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> BenchmarkResult:
         model = self.params.get("model", "resnet50")
         framework = self.params.get("framework", "onnxruntime")
         scenario = _normalize_scenario(self.params.get("scenario", "Offline"))
@@ -266,8 +281,11 @@ class MlperfBenchmark(BaseBenchmark):
         mlperf_cmd = _find_mlperf_cmd()
         if not mlperf_cmd:
             return BenchmarkResult(
-                benchmark=self.name, gpu_model="unknown", gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark=self.name,
+                gpu_model="unknown",
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error="MLPerf CLI not found. Install with: pip install --user cmx4mlperf",
             )
@@ -283,18 +301,20 @@ class MlperfBenchmark(BaseBenchmark):
         gpu_model = _detect_gpu_model(gpu_index)
 
         cmd = self._build_cmd(mlperf_cmd, scenario, mode=mode)
-        cmd.extend([
-            f"--model={model}",
-            f"--implementation={implementation}",
-            f"--framework={framework}",
-            f"--category={category}",
-            f"--scenario={scenario}",
-            f"--execution_mode={mode}",
-            "--device=cuda",
-            f"--test_query_count={test_query_count}",
-            "--quiet",
-            "--env.PIP_USER=1",
-        ])
+        cmd.extend(
+            [
+                f"--model={model}",
+                f"--implementation={implementation}",
+                f"--framework={framework}",
+                f"--category={category}",
+                f"--scenario={scenario}",
+                f"--execution_mode={mode}",
+                "--device=cuda",
+                f"--test_query_count={test_query_count}",
+                "--quiet",
+                "--env.PIP_USER=1",
+            ]
+        )
         if custom_batch_size is not None:
             cmd.append(f"--batch_size={custom_batch_size}")
 
@@ -318,10 +338,15 @@ class MlperfBenchmark(BaseBenchmark):
                 env["MLC_CUDA_PATH_INCLUDE_CUDNN"] = os.path.join(cudnn_root, "include")
                 env["LD_LIBRARY_PATH"] = (
                     f"{cudnn_lib}:{env['LD_LIBRARY_PATH']}"
-                    if env.get("LD_LIBRARY_PATH") else cudnn_lib
+                    if env.get("LD_LIBRARY_PATH")
+                    else cudnn_lib
                 )
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=7200, check=True,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=7200,
+                check=True,
                 env=env,
             )
             full_output = proc.stdout + "\n" + proc.stderr
@@ -342,8 +367,15 @@ class MlperfBenchmark(BaseBenchmark):
             parsed = _parse_mlperf_output(full_output)
             if parsed.get("queries_per_second"):
                 metrics["queries_per_second"] = parsed["queries_per_second"]
-            for k in ("latency_p99", "latency_p95", "latency_p90", "latency_p50",
-                      "latency_mean", "latency_max", "completed_queries"):
+            for k in (
+                "latency_p99",
+                "latency_p95",
+                "latency_p90",
+                "latency_p50",
+                "latency_mean",
+                "latency_max",
+                "completed_queries",
+            ):
                 if k in parsed:
                     metrics[k] = parsed[k]
             if compat_warning:
@@ -362,8 +394,11 @@ class MlperfBenchmark(BaseBenchmark):
             )
         except FileNotFoundError:
             return BenchmarkResult(
-                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
+                benchmark=self.name,
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
                 success=False,
                 error="MLPerf CLI not found. Install with: pip install --user cmx4mlperf",
             )
@@ -379,27 +414,40 @@ class MlperfBenchmark(BaseBenchmark):
 
             # --- real cuDNN error patterns (not just any mention of "cudnn") ---
             _CUDNN_ERROR_PATTERNS = (
-                "libcudnn.so", "cudnn is not", "cudnn not found",
-                "cudnn.*not found", "cudnn_root is not set",
-                "cannot open shared object", "no module named.*cudnn",
-                "cudnn.*failed", "cudnn.*error",
+                "libcudnn.so",
+                "cudnn is not",
+                "cudnn not found",
+                "cudnn.*not found",
+                "cudnn_root is not set",
+                "cannot open shared object",
+                "no module named.*cudnn",
+                "cudnn.*failed",
+                "cudnn.*error",
             )
             stderr_lower = stderr.lower()
             has_real_cudnn_error = any(
-                p in stderr_lower or p in stderr
-                for p in _CUDNN_ERROR_PATTERNS
+                p in stderr_lower or p in stderr for p in _CUDNN_ERROR_PATTERNS
             )
 
             # Extract meaningful error lines, skipping verbose mlcr logs
             error_lines = []
             for line in stderr.splitlines():
                 line_stripped = line.strip()
-                if any(kw in line_stripped.lower() for kw in (
-                    "error", "failed", "permission denied",
-                    "not found", "exception", "traceback",
-                )):
+                if any(
+                    kw in line_stripped.lower()
+                    for kw in (
+                        "error",
+                        "failed",
+                        "permission denied",
+                        "not found",
+                        "exception",
+                        "traceback",
+                    )
+                ):
                     error_lines.append(line_stripped)
-            detail = "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
+            detail = (
+                "\n".join(error_lines[-10:]) if error_lines else stderr.strip()[-300:]
+            )
 
             if has_real_cudnn_error:
                 detail = (
@@ -407,12 +455,12 @@ class MlperfBenchmark(BaseBenchmark):
                     "  mlcr's sub-scripts do not inherit parent environment\n"
                     "  variables (CUDNN_ROOT, LD_LIBRARY_PATH).\n"
                     "  Options:\n"
-                    f"  1. Register pip-installed cuDNN with mlcr:\n"
-                    f"       mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')\n"
+                    "  1. Register pip-installed cuDNN with mlcr:\n"
+                    "       mlcr get,cudnn,nvidia --input=$(python3 -c 'import nvidia.cudnn; print(nvidia.cudnn.__path__[0])')\n"
                     "     Then run 'nvprobe run' again.\n"
                     "  2. Download cuDNN tar from https://developer.nvidia.com/cudnn\n"
                     "     and register it:\n"
-                    f"       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
+                    "       mlcr get,cudnn,nvidia --tar_file=/path/to/cudnn-linux-*.tar.xz\n"
                     "  3. Install cuDNN system-wide (RPM/deb) into the CUDA\n"
                     "     toolkit directory."
                 )
@@ -432,12 +480,18 @@ class MlperfBenchmark(BaseBenchmark):
                 detail = compat_warning + "\n\n" + detail
 
             return BenchmarkResult(
-                benchmark=self.name, gpu_model=gpu_model, gpu_index=gpu_index,
-                precision=precision, batch_size=batch_size,
-                success=False, error=detail or f"{exc}",
+                benchmark=self.name,
+                gpu_model=gpu_model,
+                gpu_index=gpu_index,
+                precision=precision,
+                batch_size=batch_size,
+                success=False,
+                error=detail or f"{exc}",
             )
 
-    def build_slurm_script(self, gpu_index: int, precision: str, batch_size: int) -> str:
+    def build_slurm_script(
+        self, gpu_index: int, precision: str, batch_size: int
+    ) -> str:
         """Return shell commands for this benchmark (without SBATCH headers)."""
         model = self.params.get("model", "resnet50")
         framework = self.params.get("framework", "onnxruntime")

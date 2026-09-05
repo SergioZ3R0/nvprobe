@@ -55,7 +55,9 @@ class Database:
         """)
         self._conn.commit()
 
-    def create_run(self, name: str, description: str, environment: dict[str, Any]) -> int:
+    def create_run(
+        self, name: str, description: str, environment: dict[str, Any]
+    ) -> int:
         """Create a new run and return its ID."""
         now = datetime.now(timezone.utc).isoformat()
         cur = self._conn.execute(
@@ -65,7 +67,9 @@ class Database:
         self._conn.commit()
         return cur.lastrowid  # type: ignore[return-value]
 
-    def insert_result(self, run_id: int, result: BenchmarkResult, elapsed: float) -> int:
+    def insert_result(
+        self, run_id: int, result: BenchmarkResult, elapsed: float
+    ) -> int:
         """Insert a benchmark result and return its ID."""
         now = datetime.now(timezone.utc).isoformat()
         cur = self._conn.execute(
@@ -93,7 +97,9 @@ class Database:
 
     def get_runs(self) -> list[dict[str, Any]]:
         """Return all runs."""
-        rows = self._conn.execute("SELECT * FROM runs ORDER BY created_at DESC").fetchall()
+        rows = self._conn.execute(
+            "SELECT * FROM runs ORDER BY created_at DESC"
+        ).fetchall()
         return [dict(r) for r in rows]
 
     def get_results(self, run_id: int) -> list[dict[str, Any]]:
@@ -104,7 +110,9 @@ class Database:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_results_by_benchmark(self, run_id: int, benchmark: str) -> list[dict[str, Any]]:
+    def get_results_by_benchmark(
+        self, run_id: int, benchmark: str
+    ) -> list[dict[str, Any]]:
         """Return results filtered by benchmark name."""
         rows = self._conn.execute(
             "SELECT * FROM results WHERE run_id = ? AND benchmark = ? ORDER BY gpu_index, precision, batch_size",
@@ -127,8 +135,17 @@ class Database:
             raise ValueError(f"No results found for run {run_id}")
 
         csv_path = output_path.with_suffix(".csv")
-        fieldnames = ["benchmark", "gpu_model", "gpu_index", "precision", "batch_size",
-                       "elapsed_seconds", "success", "error", "metrics"]
+        fieldnames = [
+            "benchmark",
+            "gpu_model",
+            "gpu_index",
+            "precision",
+            "batch_size",
+            "elapsed_seconds",
+            "success",
+            "error",
+            "metrics",
+        ]
 
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -141,7 +158,9 @@ class Database:
 
     def export_json(self, run_id: int, output_path: Path) -> Path:
         """Export results to JSON file."""
-        run = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        run = self._conn.execute(
+            "SELECT * FROM runs WHERE id = ?", (run_id,)
+        ).fetchone()
         if run is None:
             raise ValueError(f"Run {run_id} not found")
 
@@ -159,7 +178,7 @@ class Database:
     def close(self) -> None:
         self._conn.close()
 
-    def __enter__(self) -> "Database":
+    def __enter__(self) -> Database:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -176,12 +195,17 @@ def _parse_mib(value: str) -> int:
 
 def _nvidia_smi_query(*fields: str, gpu_index: int | None = None) -> list[str]:
     """Run nvidia-smi with given query fields, return list of per-row strings."""
-    cmd = ["nvidia-smi", f"--query-gpu={','.join(fields)}",
-           "--format=csv,noheader,nounits"]
+    cmd = [
+        "nvidia-smi",
+        f"--query-gpu={','.join(fields)}",
+        "--format=csv,noheader,nounits",
+    ]
     if gpu_index is not None:
         cmd.extend(["-i", str(gpu_index)])
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=10)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=10
+        )
         return [l.strip() for l in proc.stdout.strip().splitlines() if l.strip()]
     except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
         return []
@@ -205,45 +229,56 @@ def fingerprint_environment() -> dict[str, Any]:
 
     # Parse CUDA version from nvidia-smi banner (handles both old "CUDA Version: X.Y"
     # and new "CUDA UMD Version: X.Y" formats from driver 610+)
-    m = re.search(r'CUDA (?:UMD )?Version:\s*([\d.]+)', smi)
+    m = re.search(r"CUDA (?:UMD )?Version:\s*([\d.]+)", smi)
     if m:
         info["cuda_version"] = m.group(1)
 
     # Try combined query first (fast path)
     all_rows = _nvidia_smi_query(
-        "driver_version", "name", "index", "memory.total", "pci.bus_id",
+        "driver_version",
+        "name",
+        "index",
+        "memory.total",
+        "pci.bus_id",
     )
     if all_rows:
         for row in all_rows:
             parts = row.split(",")
             if len(parts) >= 5:
                 info["driver_version"] = parts[0].strip()
-                info["gpus"].append({
-                    "model": parts[1].strip(),
-                    "index": int(parts[2].strip()),
-                    "memory_total_mb": _parse_mib(parts[3].strip()),
-                    "pci_bus_id": parts[4].strip(),
-                })
+                info["gpus"].append(
+                    {
+                        "model": parts[1].strip(),
+                        "index": int(parts[2].strip()),
+                        "memory_total_mb": _parse_mib(parts[3].strip()),
+                        "pci_bus_id": parts[4].strip(),
+                    }
+                )
 
     # Fallback: per-GPU queries (handles commas in GPU names gracefully)
     if not info["gpus"]:
         for i in range(64):  # upper bound
-            rows = _nvidia_smi_query("name", "index", "memory.total", "pci.bus_id", gpu_index=i)
+            rows = _nvidia_smi_query(
+                "name", "index", "memory.total", "pci.bus_id", gpu_index=i
+            )
             if not rows:
                 break
             parts = rows[0].split(",")
             if len(parts) >= 4:
-                info["gpus"].append({
-                    "model": parts[0].strip(),
-                    "index": int(parts[1].strip()),
-                    "memory_total_mb": _parse_mib(parts[2].strip()),
-                    "pci_bus_id": parts[3].strip(),
-                })
+                info["gpus"].append(
+                    {
+                        "model": parts[0].strip(),
+                        "index": int(parts[1].strip()),
+                        "memory_total_mb": _parse_mib(parts[2].strip()),
+                        "pci_bus_id": parts[3].strip(),
+                    }
+                )
 
     # CuPy fallback
     if not info["gpus"]:
         try:
             import cupy as cp
+
             count = cp.cuda.runtime.getDeviceCount()
             for i in range(count):
                 props = cp.cuda.runtime.getDeviceProperties(i)
@@ -256,14 +291,18 @@ def fingerprint_environment() -> dict[str, Any]:
                     mem_mb = total_bytes // (1024 * 1024)
                 except Exception:
                     mem_mb = 0
-                info["gpus"].append({
-                    "model": str(name),
-                    "index": i,
-                    "memory_total_mb": mem_mb,
-                    "pci_bus_id": "",
-                })
+                info["gpus"].append(
+                    {
+                        "model": str(name),
+                        "index": i,
+                        "memory_total_mb": mem_mb,
+                        "pci_bus_id": "",
+                    }
+                )
                 if not info["driver_version"]:
-                    info["driver_version"] = f"via cupy (CUDA {cp.cuda.runtime.runtimeGetVersion()})"
+                    info["driver_version"] = (
+                        f"via cupy (CUDA {cp.cuda.runtime.runtimeGetVersion()})"
+                    )
                 if not info["cuda_version"]:
                     info["cuda_version"] = str(cp.cuda.runtime.runtimeGetVersion())
         except Exception:
@@ -282,12 +321,15 @@ def _enrich_gpu_diagnostics(gpus: list[dict[str, Any]]) -> None:
     for gpu in gpus:
         idx = gpu["index"]
         rows = _nvidia_smi_query(
-            "clocks.max.sm", "clocks.max.mem",
-            "power.limit", "power.draw",
+            "clocks.max.sm",
+            "clocks.max.mem",
+            "power.limit",
+            "power.draw",
             "ecc.mode.current",
             "ecc.errors.corrected.volatile.total",
             "ecc.errors.uncorrected.volatile.total",
-            "pcie.link.gen.max", "pcie.link.width.max",
+            "pcie.link.gen.max",
+            "pcie.link.width.max",
             gpu_index=idx,
         )
         if not rows:
@@ -324,7 +366,9 @@ def _parse_int_or_none(value: str) -> int | None:
 def _run_cmd_safe(cmd: list[str]) -> str:
     """Run a command safely, returning empty string on failure."""
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=30
+        )
         return proc.stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
@@ -343,7 +387,10 @@ def _query_nvlink_status(gpu_index: int) -> int | None:
     try:
         proc = subprocess.run(
             ["nvidia-smi", "nvlink", "-s", "-i", str(gpu_index)],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
         )
         active = 0
         for line in proc.stdout.splitlines():

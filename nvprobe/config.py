@@ -94,11 +94,13 @@ def _parse_config(raw: dict[str, Any]) -> RunConfig:
     benchmarks = []
     for b in raw.get("benchmarks", []):
         params = {k: _expand_user(v) for k, v in b.get("params", {}).items()}
-        benchmarks.append(BenchmarkConfig(
-            name=b["name"],
-            enabled=b.get("enabled", True),
-            params=params,
-        ))
+        benchmarks.append(
+            BenchmarkConfig(
+                name=b["name"],
+                enabled=b.get("enabled", True),
+                params=params,
+            )
+        )
 
     return RunConfig(
         name=raw.get("name", "benchmark-run"),
