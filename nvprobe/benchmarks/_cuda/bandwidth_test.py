@@ -17,7 +17,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import math
 from typing import Any
 
 import numpy as np
@@ -75,8 +74,14 @@ def run_bandwidth_test(
     }
     numpy_dtype = np_dtype_map.get(precision, np.float32)
 
-    n_runs = 5   # number of independent runs for statistics
-    results: dict[str, Any] = {"h2d": {}, "d2h": {}, "d2d": {}, "bidir": {}, "latency_ns": {}}
+    n_runs = 5  # number of independent runs for statistics
+    results: dict[str, Any] = {
+        "h2d": {},
+        "d2h": {},
+        "d2d": {},
+        "bidir": {},
+        "latency_ns": {},
+    }
 
     for size_mb in sizes_mb:
         n_bytes = size_mb * 1024 * 1024
@@ -240,15 +245,17 @@ def main() -> None:
     gpu_info = get_gpu_info(args.gpu)
     bw_results = run_bandwidth_test(args.gpu, sizes, args.iterations, args.precision)
 
-    output_json({
-        "benchmark": "bandwidth",
-        "gpu_model": gpu_info["model"],
-        "gpu_index": args.gpu,
-        "precision": args.precision,
-        "iterations": args.iterations,
-        "sizes_mb": sizes,
-        "metrics": bw_results,
-    })
+    output_json(
+        {
+            "benchmark": "bandwidth",
+            "gpu_model": gpu_info["model"],
+            "gpu_index": args.gpu,
+            "precision": args.precision,
+            "iterations": args.iterations,
+            "sizes_mb": sizes,
+            "metrics": bw_results,
+        }
+    )
 
 
 if __name__ == "__main__":

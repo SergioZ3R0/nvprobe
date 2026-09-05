@@ -135,7 +135,12 @@ def run_memtest(size_bytes: int) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="GPU memory test")
     parser.add_argument("--gpu", type=int, required=True, help="GPU index to test")
-    parser.add_argument("--size", type=int, default=1024, help="Test size in MB (uses free memory if larger)")
+    parser.add_argument(
+        "--size",
+        type=int,
+        default=1024,
+        help="Test size in MB (uses free memory if larger)",
+    )
     args = parser.parse_args()
 
     try:

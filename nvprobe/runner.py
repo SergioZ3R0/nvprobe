@@ -6,7 +6,6 @@ import copy
 import json
 import subprocess
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +19,9 @@ def detect_environment() -> dict[str, Any]:
     return fingerprint_environment()
 
 
-def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry_run: bool = False) -> None:
+def run_benchmarks(
+    config_path: Path, output_dir: Path, local: bool = False, dry_run: bool = False
+) -> None:
     """Run all enabled benchmarks from config, saving results to output_dir."""
     config = load_config(config_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -53,7 +54,13 @@ def run_benchmarks(config_path: Path, output_dir: Path, local: bool = False, dry
                 continue
 
             bench_ok = _run_single_benchmark(
-                db, run_id, bench_cfg, bench_cls, gpus, config, dry_run,
+                db,
+                run_id,
+                bench_cfg,
+                bench_cls,
+                gpus,
+                config,
+                dry_run,
             )
             if not bench_ok:
                 all_ok = False
@@ -75,8 +82,14 @@ def _get_sizes(bench_cfg: Any, size_keys: list[str]) -> list:
 
 
 def _run_and_log(
-    db: Database, run_id: int, bench_cls: type, bench_cfg: Any,
-    gpu_index: int, precision: str, batch_size: int, dry_run: bool,
+    db: Database,
+    run_id: int,
+    bench_cls: type,
+    bench_cfg: Any,
+    gpu_index: int,
+    precision: str,
+    batch_size: int,
+    dry_run: bool,
 ) -> bool:
     """Run a single benchmark combination and log to DB.
 
@@ -104,18 +117,28 @@ def _run_and_log(
         elapsed = time.monotonic() - t0
         print(f"ERROR: {exc} ({elapsed:.1f}s)")
         from nvprobe.benchmarks.base import BenchmarkResult
+
         result = BenchmarkResult(
-            benchmark=bench_cfg.name, gpu_model="unknown",
-            gpu_index=gpu_index, precision=precision, batch_size=batch_size,
-            success=False, error=f"Unhandled exception: {exc}",
+            benchmark=bench_cfg.name,
+            gpu_model="unknown",
+            gpu_index=gpu_index,
+            precision=precision,
+            batch_size=batch_size,
+            success=False,
+            error=f"Unhandled exception: {exc}",
         )
         db.insert_result(run_id, result, elapsed)
         return False
 
 
 def _run_single_benchmark(
-    db: Database, run_id: int, bench_cfg: Any, bench_cls: type,
-    gpus: list[dict], config: RunConfig, dry_run: bool,
+    db: Database,
+    run_id: int,
+    bench_cfg: Any,
+    bench_cls: type,
+    gpus: list[dict],
+    config: RunConfig,
+    dry_run: bool,
 ) -> bool:
     """Run a single benchmark across all parameter combinations.
 
@@ -160,10 +183,15 @@ def _run_single_benchmark(
                     elapsed = time.monotonic() - t0
                     print(f"ERROR: {exc} ({elapsed:.1f}s)")
                     from nvprobe.benchmarks.base import BenchmarkResult
+
                     result = BenchmarkResult(
-                        benchmark=bench_cfg.name, gpu_model="unknown",
-                        gpu_index=gpu_index, precision="fp32", batch_size=1,
-                        success=False, error=f"Unhandled exception: {exc}",
+                        benchmark=bench_cfg.name,
+                        gpu_model="unknown",
+                        gpu_index=gpu_index,
+                        precision="fp32",
+                        batch_size=1,
+                        success=False,
+                        error=f"Unhandled exception: {exc}",
                     )
                     db.insert_result(run_id, result, elapsed)
                     all_ok = False
@@ -173,8 +201,14 @@ def _run_single_benchmark(
                 for gpu in gpus:
                     gpu_index = gpu["index"]
                     ok = _run_and_log(
-                        db, run_id, bench_cls, bench_cfg,
-                        gpu_index, precision, batch_size, dry_run,
+                        db,
+                        run_id,
+                        bench_cls,
+                        bench_cfg,
+                        gpu_index,
+                        precision,
+                        batch_size,
+                        dry_run,
                     )
                     if not ok:
                         all_ok = False

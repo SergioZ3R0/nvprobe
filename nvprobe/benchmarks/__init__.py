@@ -3,8 +3,8 @@
 from nvprobe.benchmarks.bandwidth import BandwidthBenchmark
 from nvprobe.benchmarks.burn import BurnBenchmark
 from nvprobe.benchmarks.custom import CustomCudaBenchmark
-from nvprobe.benchmarks.hpl import HplBenchmark
 from nvprobe.benchmarks.hpcg import HpcgBenchmark
+from nvprobe.benchmarks.hpl import HplBenchmark
 from nvprobe.benchmarks.memtest import MemtestBenchmark
 from nvprobe.benchmarks.mlperf import MlperfBenchmark
 
@@ -23,8 +23,8 @@ __all__ = [
     "BandwidthBenchmark",
     "BurnBenchmark",
     "CustomCudaBenchmark",
-    "HplBenchmark",
     "HpcgBenchmark",
+    "HplBenchmark",
     "MemtestBenchmark",
     "MlperfBenchmark",
 ]

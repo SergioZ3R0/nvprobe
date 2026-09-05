@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 from typing import Any
 
-from nvprobe import __version__
 from nvprobe.db import Database
-
 
 # ── Design tokens (same as landing page) ──
 ACCENT = "#39FF88"
@@ -117,7 +114,10 @@ def _chart_default_opts(title_label: str = "") -> dict:
             "legend": {
                 "labels": {
                     "color": MUTED,
-                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 11},
+                    "font": {
+                        "family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace",
+                        "size": 11,
+                    },
                     "boxWidth": 14,
                     "padding": 14,
                 }
@@ -125,8 +125,14 @@ def _chart_default_opts(title_label: str = "") -> dict:
             "tooltip": {
                 "enabled": True,
                 "backgroundColor": SURFACE,
-                "titleFont": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 12},
-                "bodyFont": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 11},
+                "titleFont": {
+                    "family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace",
+                    "size": 12,
+                },
+                "bodyFont": {
+                    "family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace",
+                    "size": 11,
+                },
                 "borderColor": BORDER,
                 "borderWidth": 1,
                 "padding": 10,
@@ -140,14 +146,20 @@ def _chart_default_opts(title_label: str = "") -> dict:
                 "grid": {"color": "rgba(255,255,255,0.04)"},
                 "ticks": {
                     "color": MUTED,
-                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 10},
+                    "font": {
+                        "family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace",
+                        "size": 10,
+                    },
                 },
             },
             "y": {
                 "grid": {"color": "rgba(255,255,255,0.04)"},
                 "ticks": {
                     "color": MUTED,
-                    "font": {"family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace", "size": 10},
+                    "font": {
+                        "family": "IBM Plex Mono, JetBrains Mono, Fira Code, monospace",
+                        "size": 10,
+                    },
                 },
             },
         },
@@ -178,22 +190,26 @@ def _chart_bandwidth(results: list[dict[str, Any]]) -> str:
     datasets = []
     trace_info: list[list[int | str]] = []
     for i, (gpu, data) in enumerate(grouped.items()):
-        for ti, (ttype, cname) in enumerate([("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]):
+        for ti, (ttype, cname) in enumerate(
+            [("h2d", "H2D"), ("d2h", "D2H"), ("d2d", "D2D")]
+        ):
             vals = [_extract_val(v, "mean") for v in data.get(ttype, {}).values()]
             if not vals:
                 continue
             color = SERIES_COLORS[i % len(SERIES_COLORS)]
-            datasets.append({
-                "label": f"{gpu} {cname}",
-                "data": vals,
-                "backgroundColor": color + "99",
-                "borderColor": color,
-                "borderWidth": 1,
-                "borderRadius": 2,
-                "hidden": ttype != "h2d",
-                "gpu_idx": i,
-                "ttype": ttype,
-            })
+            datasets.append(
+                {
+                    "label": f"{gpu} {cname}",
+                    "data": vals,
+                    "backgroundColor": color + "99",
+                    "borderColor": color,
+                    "borderWidth": 1,
+                    "borderRadius": 2,
+                    "hidden": ttype != "h2d",
+                    "gpu_idx": i,
+                    "ttype": ttype,
+                }
+            )
             trace_info.append([i, ttype])
 
     n_traces = len(trace_info)
@@ -320,21 +336,23 @@ def _chart_line_with_filters(
         vals = [data[str(s)].get(value_key, 0) for s in sizes]
         smooth = _moving_average(vals, max(3, len(vals) // 8))
         color = SERIES_COLORS[i % len(SERIES_COLORS)]
-        datasets.append({
-            "label": f"GPU {gpu_idx} ({prec})",
-            "data": smooth,
-            "borderColor": color,
-            "backgroundColor": color + "0f",
-            "fill": True,
-            "tension": 0.3,
-            "pointRadius": 3,
-            "pointBackgroundColor": color,
-            "pointBorderColor": color,
-            "pointHoverRadius": 5,
-            "borderWidth": 2,
-            "gpu_idx": gpu_idx,
-            "precision": prec,
-        })
+        datasets.append(
+            {
+                "label": f"GPU {gpu_idx} ({prec})",
+                "data": smooth,
+                "borderColor": color,
+                "backgroundColor": color + "0f",
+                "fill": True,
+                "tension": 0.3,
+                "pointRadius": 3,
+                "pointBackgroundColor": color,
+                "pointBorderColor": color,
+                "pointHoverRadius": 5,
+                "borderWidth": 2,
+                "gpu_idx": gpu_idx,
+                "precision": prec,
+            }
+        )
         trace_meta.append([gpu_idx, prec])
 
     chart_id = f"ch-{benchmark_key}"
@@ -397,11 +415,10 @@ def _chart_line_with_filters(
 }})();
 </script>"""
 
-    gpu_opts = "".join(
-        f'<option value="{gi}">GPU {gi}</option>' for gi in gpu_indices
-    )
+    gpu_opts = "".join(f'<option value="{gi}">GPU {gi}</option>' for gi in gpu_indices)
     prec_opts = "".join(
-        f'<option value="{p}" {"selected" if p == precisions[0] else ""}>{p}</option>' for p in precisions
+        f'<option value="{p}" {"selected" if p == precisions[0] else ""}>{p}</option>'
+        for p in precisions
     )
 
     return f"""<details class="chart" open>
@@ -424,18 +441,39 @@ def _chart_line_with_filters(
 
 
 def _chart_matmul(results: list[dict[str, Any]]) -> str:
-    return _chart_line_with_filters(results, "matmul", "Matrix Multiplication Performance",
-                                    "Matrix Size (N×N)", "GFLOPS", "gflops", "GFLOPS")
+    return _chart_line_with_filters(
+        results,
+        "matmul",
+        "Matrix Multiplication Performance",
+        "Matrix Size (N×N)",
+        "GFLOPS",
+        "gflops",
+        "GFLOPS",
+    )
 
 
 def _chart_tiled_matmul(results: list[dict[str, Any]]) -> str:
-    return _chart_line_with_filters(results, "tiled_matmul", "Tiled MatMul (Shared Memory)",
-                                    "Matrix Size (N×N)", "GFLOPS", "gflops", "GFLOPS")
+    return _chart_line_with_filters(
+        results,
+        "tiled_matmul",
+        "Tiled MatMul (Shared Memory)",
+        "Matrix Size (N×N)",
+        "GFLOPS",
+        "gflops",
+        "GFLOPS",
+    )
 
 
 def _chart_attention(results: list[dict[str, Any]]) -> str:
-    return _chart_line_with_filters(results, "attention", "Scaled Dot-Product Attention",
-                                    "Sequence Length", "TFLOPS", "tflops", "TFLOPS")
+    return _chart_line_with_filters(
+        results,
+        "attention",
+        "Scaled Dot-Product Attention",
+        "Sequence Length",
+        "TFLOPS",
+        "tflops",
+        "TFLOPS",
+    )
 
 
 def _chart_hpl(results: list[dict[str, Any]]) -> str:
@@ -468,14 +506,16 @@ def _chart_hpl(results: list[dict[str, Any]]) -> str:
         size_map = {s: v for s, v in pairs}
         vals = [size_map.get(s, 0) for s in all_sizes]
         color = SERIES_COLORS[i % len(SERIES_COLORS)]
-        datasets.append({
-            "label": label,
-            "data": vals,
-            "backgroundColor": color + "99",
-            "borderColor": color,
-            "borderWidth": 1,
-            "borderRadius": 2,
-        })
+        datasets.append(
+            {
+                "label": label,
+                "data": vals,
+                "backgroundColor": color + "99",
+                "borderColor": color,
+                "borderWidth": 1,
+                "borderRadius": 2,
+            }
+        )
 
     return _chart_canvas(
         "bar",
@@ -484,11 +524,35 @@ def _chart_hpl(results: list[dict[str, Any]]) -> str:
             **_chart_default_opts(),
             "plugins": {
                 **_chart_default_opts()["plugins"],
-                "legend": {"labels": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}},
+                "legend": {
+                    "labels": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    }
+                },
             },
             "scales": {
-                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
-                "y": {"beginAtZero": True, "title": {"display": True, "text": "GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "x": {
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
+                "y": {
+                    "beginAtZero": True,
+                    "title": {
+                        "display": True,
+                        "text": "GFLOPS",
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    },
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
             },
         },
         title="HPL — High Performance Linpack",
@@ -526,14 +590,16 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
         size_map = {s: v for s, v in pairs}
         vals = [size_map.get(s, 0) for s in all_sizes]
         color = SERIES_COLORS[i % len(SERIES_COLORS)]
-        datasets.append({
-            "label": label,
-            "data": vals,
-            "backgroundColor": color + "99",
-            "borderColor": color,
-            "borderWidth": 1,
-            "borderRadius": 2,
-        })
+        datasets.append(
+            {
+                "label": label,
+                "data": vals,
+                "backgroundColor": color + "99",
+                "borderColor": color,
+                "borderWidth": 1,
+                "borderRadius": 2,
+            }
+        )
 
     return _chart_canvas(
         "bar",
@@ -541,8 +607,27 @@ def _chart_hpcg(results: list[dict[str, Any]]) -> str:
         {
             **_chart_default_opts(),
             "scales": {
-                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
-                "y": {"beginAtZero": True, "title": {"display": True, "text": "GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "x": {
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
+                "y": {
+                    "beginAtZero": True,
+                    "title": {
+                        "display": True,
+                        "text": "GFLOPS",
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    },
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
             },
         },
         title="HPCG — Conjugate Gradients",
@@ -565,7 +650,9 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
             scenario = metrics.get("scenario", "?")
             model = metrics.get("model", "?")
             acc = metrics.get("accuracy")
-            data.append((f"{label} {model} {scenario}", float(qps), float(acc) if acc else None))
+            data.append(
+                (f"{label} {model} {scenario}", float(qps), float(acc) if acc else None)
+            )
 
     if not data:
         return ""
@@ -576,14 +663,16 @@ def _chart_mlperf(results: list[dict[str, Any]]) -> str:
     for _, _, acc in data:
         annotations.append(f"{acc:.1f}%" if acc is not None else "")
 
-    datasets = [{
-        "label": "Throughput (qps)",
-        "data": vals,
-        "backgroundColor": [ACCENT + "99" for _ in vals],
-        "borderColor": ACCENT,
-        "borderWidth": 1,
-        "borderRadius": 2,
-    }]
+    datasets = [
+        {
+            "label": "Throughput (qps)",
+            "data": vals,
+            "backgroundColor": [ACCENT + "99" for _ in vals],
+            "borderColor": ACCENT,
+            "borderWidth": 1,
+            "borderRadius": 2,
+        }
+    ]
 
     chart_id = "ch-mlperf"
     labels_json = json.dumps(labels)
@@ -666,15 +755,18 @@ def _chart_memtest(results: list[dict[str, Any]]) -> str:
             continue
         seen.add(gpu_label)
 
-        patterns = {k: v for k, v in metrics.items()
-                    if isinstance(v, dict) and "errors" in v}
+        patterns = {
+            k: v for k, v in metrics.items() if isinstance(v, dict) and "errors" in v
+        }
         for pattern_name, pat_data in sorted(patterns.items()):
-            data.append({
-                "label": f"{gpu_label} {pattern_name}",
-                "errors": pat_data.get("errors", 0),
-                "bandwidth_gbs": pat_data.get("bandwidth_gbs", 0),
-                "passed": pat_data.get("passed", True),
-            })
+            data.append(
+                {
+                    "label": f"{gpu_label} {pattern_name}",
+                    "errors": pat_data.get("errors", 0),
+                    "bandwidth_gbs": pat_data.get("bandwidth_gbs", 0),
+                    "passed": pat_data.get("passed", True),
+                }
+            )
 
     if not data:
         return ""
@@ -920,11 +1012,35 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
             **_chart_default_opts(),
             "plugins": {
                 **_chart_default_opts()["plugins"],
-                "legend": {"labels": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}},
+                "legend": {
+                    "labels": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    }
+                },
             },
             "scales": {
-                "x": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
-                "y": {"beginAtZero": True, "title": {"display": True, "text": "Run Count", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "x": {
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
+                "y": {
+                    "beginAtZero": True,
+                    "title": {
+                        "display": True,
+                        "text": "Run Count",
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    },
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
             },
         },
         title="Pass / Fail by Benchmark",
@@ -937,14 +1053,22 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
     # Avg performance horizontal bar
     perf_data = {
         "labels": perf_names,
-        "datasets": [{
-            "label": "Avg GFLOPS",
-            "data": perf_vals,
-            "backgroundColor": [SERIES_COLORS[i % len(SERIES_COLORS)] + "99" for i in range(len(perf_names))],
-            "borderColor": [SERIES_COLORS[i % len(SERIES_COLORS)] for i in range(len(perf_names))],
-            "borderWidth": 1,
-            "borderRadius": 2,
-        }],
+        "datasets": [
+            {
+                "label": "Avg GFLOPS",
+                "data": perf_vals,
+                "backgroundColor": [
+                    SERIES_COLORS[i % len(SERIES_COLORS)] + "99"
+                    for i in range(len(perf_names))
+                ],
+                "borderColor": [
+                    SERIES_COLORS[i % len(SERIES_COLORS)]
+                    for i in range(len(perf_names))
+                ],
+                "borderWidth": 1,
+                "borderRadius": 2,
+            }
+        ],
     }
 
     perf_html = _chart_canvas(
@@ -958,8 +1082,27 @@ def _chart_summary(results: list[dict[str, Any]]) -> str:
                 "legend": {"display": False},
             },
             "scales": {
-                "x": {"beginAtZero": True, "title": {"display": True, "text": "Avg GFLOPS", "color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 11}}, "grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": MUTED, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
-                "y": {"grid": {"color": "rgba(255,255,255,0.04)"}, "ticks": {"color": TEXT, "font": {"family": "'IBM Plex Mono', monospace", "size": 10}}},
+                "x": {
+                    "beginAtZero": True,
+                    "title": {
+                        "display": True,
+                        "text": "Avg GFLOPS",
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 11},
+                    },
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": MUTED,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
+                "y": {
+                    "grid": {"color": "rgba(255,255,255,0.04)"},
+                    "ticks": {
+                        "color": TEXT,
+                        "font": {"family": "'IBM Plex Mono', monospace", "size": 10},
+                    },
+                },
             },
         },
         title="Average Performance by Benchmark",
@@ -991,7 +1134,9 @@ def generate_report(
         if run_id is not None:
             target_run = next((r for r in runs if r["id"] == run_id), None)
             if target_run is None:
-                raise ValueError(f"Run ID {run_id} not found. Use 'nvprobe list' to see available runs.")
+                raise ValueError(
+                    f"Run ID {run_id} not found. Use 'nvprobe list' to see available runs."
+                )
             latest_run = target_run
         else:
             latest_run = runs[0]
@@ -1028,9 +1173,12 @@ def generate_report(
     logo_dst = run_dir / "nvprobe.svg"
     if logo_src.exists():
         import shutil
+
         shutil.copy2(logo_src, logo_dst)
 
-    html = _render_html(report_title, latest_run, results, env_info, charts, logo_src.exists())
+    html = _render_html(
+        report_title, latest_run, results, env_info, charts, logo_src.exists()
+    )
 
     report_path = run_dir / "report.html"
     report_path.write_text(html, encoding="utf-8")
@@ -1055,7 +1203,7 @@ def generate_comparison(
     run_id_b: int | None = None,
 ) -> Path:
     """Generate a comparison HTML report between two result sets.
-    
+
     If db_path is provided with run_id_a/run_id_b, compare two runs within same DB.
     Otherwise, compare two directories each containing a benchmarks.db.
     """
@@ -1074,7 +1222,10 @@ def generate_comparison(
             env_a = json.loads(run_a.get("environment") or "{}")
             env_b = json.loads(run_b.get("environment") or "{}")
     elif results_a is not None and results_b is not None:
-        with Database(results_a / "benchmarks.db") as db_a, Database(results_b / "benchmarks.db") as db_b:
+        with (
+            Database(results_a / "benchmarks.db") as db_a,
+            Database(results_b / "benchmarks.db") as db_b,
+        ):
             runs_a = db_a.get_runs()
             runs_b = db_b.get_runs()
 
@@ -1090,7 +1241,9 @@ def generate_comparison(
     else:
         raise ValueError("Either --a/--b or --a-run/--b-run must be provided")
 
-    html = _render_comparison_html(run_a, results_a_data, env_a, run_b, results_b_data, env_b)
+    html = _render_comparison_html(
+        run_a, results_a_data, env_a, run_b, results_b_data, env_b
+    )
 
     run_dir = output_dir / f"compare-run{run_a['id']}-vs-run{run_b['id']}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -1101,6 +1254,7 @@ def generate_comparison(
     logo_src = Path(__file__).parent / "nvprobe.svg"
     if logo_src.exists():
         import shutil
+
         shutil.copy2(logo_src, run_dir / "nvprobe.svg")
 
     return report_path
@@ -1292,7 +1446,7 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
 <body>
 <nav class="sidebar">
     <div class="sidebar-header">
-        {'<img src="nvprobe.svg" alt="nvProbe" style="width:72px;margin-bottom:0.5rem;">' if has_logo else ''}
+        {'<img src="nvprobe.svg" alt="nvProbe" style="width:72px;margin-bottom:0.5rem;">' if has_logo else ""}
         <div class="sidebar-title">nvProbe</div>
         <div class="sidebar-subtitle">GPU Benchmark Suite</div>
     </div>
@@ -1306,13 +1460,13 @@ footer {{ margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--borde
 </nav>
 <div class="main-content">
     <h1>{title}</h1>
-    <p class="subtitle">Run: {run['name']} | {(run.get('created_at') or '')[:19]}</p>
+    <p class="subtitle">Run: {run["name"]} | {(run.get("created_at") or "")[:19]}</p>
 
     <h2 id="overview">Overview</h2>
     <div class="env-grid">
         <div class="env-card"><div class="label">GPUs</div><div class="value">{len(gpus)}</div></div>
-        <div class="env-card"><div class="label">Driver</div><div class="value">{env_info.get('driver_version', 'N/A')}</div></div>
-        <div class="env-card"><div class="label">CUDA</div><div class="value">{env_info.get('cuda_version', 'N/A')}</div></div>
+        <div class="env-card"><div class="label">Driver</div><div class="value">{env_info.get("driver_version", "N/A")}</div></div>
+        <div class="env-card"><div class="label">CUDA</div><div class="value">{env_info.get("cuda_version", "N/A")}</div></div>
         <div class="env-card"><div class="label">Results</div><div class="value">{len(results)}</div></div>
     </div>
 
@@ -1362,15 +1516,19 @@ def _render_benchmark_tables(results: list[dict[str, Any]]) -> str:
         html += f"<h3>{bench_name}</h3>\n<table>\n"
         html += "<tr><th>GPU</th><th>Model</th><th>Precision</th><th>Batch</th><th>Status</th><th>Time (s)</th><th>Metrics</th></tr>\n"
         for r in bench_results:
-            status_badge = '<span class="badge badge-ok">OK</span>' if r["success"] else '<span class="badge badge-fail">FAIL</span>'
+            status_badge = (
+                '<span class="badge badge-ok">OK</span>'
+                if r["success"]
+                else '<span class="badge badge-fail">FAIL</span>'
+            )
             metrics = _parse_metrics(r.get("metrics", "{}"))
             metrics_str = _format_metrics(metrics)
             if len(metrics_str) > 100:
                 metrics_cell = (
                     f'<details class="metrics-details">'
-                    f'<summary>View Raw Metrics</summary>'
+                    f"<summary>View Raw Metrics</summary>"
                     f'<div class="metrics-content">{metrics_str}</div>'
-                    f'</details>'
+                    f"</details>"
                 )
             else:
                 metrics_cell = metrics_str
@@ -1452,8 +1610,8 @@ def _render_comparison_html(
     chart_html = ""
     if all_labels and all_vals_a and all_vals_b:
         labels_json = json.dumps(all_labels)
-        vals_a_json = json.dumps(all_vals_a[:len(all_labels)])
-        vals_b_json = json.dumps(all_vals_b[:len(all_labels)])
+        vals_a_json = json.dumps(all_vals_a[: len(all_labels)])
+        vals_b_json = json.dumps(all_vals_b[: len(all_labels)])
         name_a = run_a["name"]
         name_b = run_b["name"]
 
@@ -1590,13 +1748,13 @@ tr:hover td {{ background: rgba(57,255,136,0.04); }}
 <h1>nvProbe Comparison Report</h1>
 <div class="run-info">
     <div class="run-card">
-        <h3>Baseline: {run_a['name']}</h3>
-        <p>{(run_a.get('created_at') or '')[:19]}</p>
+        <h3>Baseline: {run_a["name"]}</h3>
+        <p>{(run_a.get("created_at") or "")[:19]}</p>
         <p>{len(results_a)} results</p>
     </div>
     <div class="run-card">
-        <h3>Comparison: {run_b['name']}</h3>
-        <p>{(run_b.get('created_at') or '')[:19]}</p>
+        <h3>Comparison: {run_b["name"]}</h3>
+        <p>{(run_b.get("created_at") or "")[:19]}</p>
         <p>{len(results_b)} results</p>
     </div>
 </div>
@@ -1604,10 +1762,10 @@ tr:hover td {{ background: rgba(57,255,136,0.04); }}
 <h2>Performance Comparison</h2>
 {chart_html if chart_html else '<p style="color:var(--muted);font-family:var(--font-mono)">No comparable data found between runs.</p>'}
 
-<h2>Results A — {run_a['name']}</h2>
+<h2>Results A — {run_a["name"]}</h2>
 {_render_benchmark_tables(results_a)}
 
-<h2>Results B — {run_b['name']}</h2>
+<h2>Results B — {run_b["name"]}</h2>
 {_render_benchmark_tables(results_b)}
 
 <div style="text-align:center;margin-top:2rem">

@@ -13,7 +13,7 @@ import shutil
 import sqlite3
 import subprocess
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -118,7 +118,9 @@ class SlurmManager:
         """Collect results from completed jobs and merge databases."""
         merged_db_path = self.output_dir / "benchmarks.db"
         env_info = merge_databases(
-            self.output_dir, merged_db_path, self.config.name,
+            self.output_dir,
+            merged_db_path,
+            self.config.name,
             self.config.description,
         )
         return {
@@ -172,18 +174,20 @@ class SlurmManager:
         for arg in slurm.extra_args:
             lines.append(f"#SBATCH {arg}")
 
-        lines.extend([
-            "",
-            "module purge 2>/dev/null || true",
-            "module load cuda 2>/dev/null || true",
-            "",
-            f"echo \"=== nvProbe Node {node_idx} ===\"",
-            "echo \"Job ID: $SLURM_JOB_ID\"",
-            "echo \"Node: $(hostname)\"",
-            "echo \"GPUs: $SLURM_GPUS_ON_NODE\"",
-            "echo \"==========================\"",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "module purge 2>/dev/null || true",
+                "module load cuda 2>/dev/null || true",
+                "",
+                f'echo "=== nvProbe Node {node_idx} ==="',
+                'echo "Job ID: $SLURM_JOB_ID"',
+                'echo "Node: $(hostname)"',
+                'echo "GPUs: $SLURM_GPUS_ON_NODE"',
+                'echo "=========================="',
+                "",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -206,7 +210,9 @@ echo "nvprobe completed on $(hostname)"
         try:
             proc = subprocess.run(
                 ["sbatch", str(script_path)],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             job_id = proc.stdout.strip().split()[-1]
 
@@ -231,9 +237,15 @@ echo "nvprobe completed on $(hostname)"
         try:
             proc = subprocess.run(
                 ["squeue", "--noheader", "--format=%i", "--state=R,PD,CG"],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
-            running_ids = {line.strip() for line in proc.stdout.strip().splitlines() if line.strip()}
+            running_ids = {
+                line.strip()
+                for line in proc.stdout.strip().splitlines()
+                if line.strip()
+            }
             return [j.job_id for j in self._jobs if j.job_id in running_ids]
         except (subprocess.CalledProcessError, FileNotFoundError):
             return []
@@ -243,10 +255,22 @@ echo "nvprobe completed on $(hostname)"
         for job in self._jobs:
             try:
                 proc = subprocess.run(
-                    ["sacct", "--noheader", "-j", job.job_id, "-o", "State", "--parsable2"],
-                    capture_output=True, text=True, check=True,
+                    [
+                        "sacct",
+                        "--noheader",
+                        "-j",
+                        job.job_id,
+                        "-o",
+                        "State",
+                        "--parsable2",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
-                states = [s.strip() for s in proc.stdout.strip().splitlines() if s.strip()]
+                states = [
+                    s.strip() for s in proc.stdout.strip().splitlines() if s.strip()
+                ]
                 if states:
                     job.status = states[0]
             except (subprocess.CalledProcessError, FileNotFoundError):
@@ -265,8 +289,12 @@ def merge_databases(
     """
     # Find all node databases
     node_dirs = sorted(output_dir.glob("node_*"))
-    node_db_paths = [d / "benchmarks.db" for d in node_dirs if (d / "benchmarks.db").exists()]
-    node_env_paths = [d / "environment.json" for d in node_dirs if (d / "environment.json").exists()]
+    node_db_paths = [
+        d / "benchmarks.db" for d in node_dirs if (d / "benchmarks.db").exists()
+    ]
+    node_env_paths = [
+        d / "environment.json" for d in node_dirs if (d / "environment.json").exists()
+    ]
 
     if not node_db_paths:
         print("WARNING: no node databases found to merge")
@@ -296,7 +324,10 @@ def merge_databases(
             rd = dict(row)
             new_gpu = rd["gpu_index"] + gpu_offset
             identity = _make_identity(
-                rd["benchmark"], new_gpu, rd["precision"], rd["batch_size"],
+                rd["benchmark"],
+                new_gpu,
+                rd["precision"],
+                rd["batch_size"],
             )
             merged_db.execute(
                 """INSERT OR IGNORE INTO results
@@ -305,10 +336,19 @@ def merge_databases(
                     success, error, elapsed_sec, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    run_id, identity, rd["benchmark"], rd["gpu_model"],
-                    new_gpu, rd["precision"], rd["batch_size"],
-                    rd["metrics"], rd["raw_output"], rd["success"],
-                    rd["error"], rd["elapsed_sec"], rd["created_at"],
+                    run_id,
+                    identity,
+                    rd["benchmark"],
+                    rd["gpu_model"],
+                    new_gpu,
+                    rd["precision"],
+                    rd["batch_size"],
+                    rd["metrics"],
+                    rd["raw_output"],
+                    rd["success"],
+                    rd["error"],
+                    rd["elapsed_sec"],
+                    rd["created_at"],
                 ),
             )
 
@@ -398,10 +438,14 @@ def _init_merged_db(db: sqlite3.Connection) -> None:
 
 
 def _create_merged_run(
-    db: sqlite3.Connection, name: str, description: str, env: dict[str, Any],
+    db: sqlite3.Connection,
+    name: str,
+    description: str,
+    env: dict[str, Any],
 ) -> int:
     """Insert a run entry into the merged database."""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc).isoformat()
     cur = db.execute(
         "INSERT INTO runs (name, description, environment, created_at) VALUES (?, ?, ?, ?)",
@@ -420,6 +464,8 @@ def _count_gpus_in_env(env_path: Path) -> int:
         return 0
 
 
-def _make_identity(benchmark: str, gpu_index: int, precision: str, batch_size: int) -> str:
+def _make_identity(
+    benchmark: str, gpu_index: int, precision: str, batch_size: int
+) -> str:
     """Build a unique identity string for deduplication."""
     return f"{benchmark}:{gpu_index}:{precision}:{batch_size}"

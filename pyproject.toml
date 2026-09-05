@@ -53,3 +53,36 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 nvprobe = ["configs/*.yaml", "nvprobe.svg"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]
+ignore = [
+    "BLE001",   # blind exception catching
+    "S110",     # try-except-pass
+    "B007",     # unused loop variable
+    "B008",     # function call in argument defaults (typer pattern)
+    "PYI034",   # __enter__ return type
+    "PYI036",   # __exit__ argument types
+    "RUF015",   # next(iter()) preference
+    "E501",     # line too long (CSS/JS in f-strings)
+    "E741",     # ambiguous variable name
+    "SIM105",   # contextlib.suppress preference
+    "SIM102",   # nested if simplification
+    "SIM118",   # .keys() removal
+    "B904",     # raise from
+    "B905",     # zip strict
+    "UP045",    # Optional[X] -> X | None
+    "UP037",    # quotes in annotations
+    "W293",     # whitespace in blank line
+    "F811",     # redefinition of unused name
+    "F841",     # unused variable
+    "C401",     # unnecessary generator
+    "C416",     # unnecessary dict comprehension
+    "PLW1510",  # subprocess.run without check
+    "RUF012",   # mutable class attribute
+    "RUF059",   # unused unpacked variable
+    "PIE810",   # startswith tuple
+]

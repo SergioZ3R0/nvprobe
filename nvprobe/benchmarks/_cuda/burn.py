@@ -39,20 +39,23 @@ def _sample_clocks(
         "nvidia-smi",
         "--query-gpu=clocks.sm,clocks.mem,temperature.gpu,power.draw",
         "--format=csv,noheader,nounits",
-        "-i", str(gpu_index),
+        "-i",
+        str(gpu_index),
     ]
     while not stop_event.is_set():
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             parts = [p.strip() for p in proc.stdout.strip().split(",")]
             if len(parts) >= 4:
-                samples.append({
-                    "t": round(time.perf_counter() - start_time, 1),
-                    "sm": _parse_or_none(parts[0]),
-                    "mem": _parse_or_none(parts[1]),
-                    "temp": _parse_or_none(parts[2]),
-                    "power": _parse_or_none(parts[3]),
-                })
+                samples.append(
+                    {
+                        "t": round(time.perf_counter() - start_time, 1),
+                        "sm": _parse_or_none(parts[0]),
+                        "mem": _parse_or_none(parts[1]),
+                        "temp": _parse_or_none(parts[2]),
+                        "power": _parse_or_none(parts[3]),
+                    }
+                )
         except Exception:
             pass
         time.sleep(interval)
@@ -132,8 +135,12 @@ def run_burn(gpu_index: int, size: int, duration_sec: int) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sustained GPU compute burn test")
     parser.add_argument("--gpu", type=int, required=True, help="GPU index")
-    parser.add_argument("--duration", type=int, default=30, help="Burn duration in seconds")
-    parser.add_argument("--size", type=int, default=8192, help="Matrix size (N for NxN)")
+    parser.add_argument(
+        "--duration", type=int, default=30, help="Burn duration in seconds"
+    )
+    parser.add_argument(
+        "--size", type=int, default=8192, help="Matrix size (N for NxN)"
+    )
     args = parser.parse_args()
 
     try:
@@ -144,7 +151,9 @@ def main() -> None:
                 args.size = int((free_bytes * 0.9 / (4 * 3)) ** 0.5)
                 args.size = (args.size // 512) * 512
                 if args.size < 512:
-                    print(json.dumps({"error": "insufficient GPU memory for burn test"}))
+                    print(
+                        json.dumps({"error": "insufficient GPU memory for burn test"})
+                    )
                     sys.exit(1)
 
         metrics = run_burn(args.gpu, args.size, args.duration)

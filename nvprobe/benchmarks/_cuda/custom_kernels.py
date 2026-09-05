@@ -19,7 +19,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import math
 from typing import Any
 
 import numpy as np
@@ -48,10 +47,18 @@ def _stats(values: list[float]) -> dict[str, float]:
     }
 
 
-def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
+def bench_matmul(
+    gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int
+) -> dict[str, Any]:
     """Benchmark matrix multiplication using cuBLAS (peak reference)."""
     cp.cuda.Device(gpu_index).use()
-    dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    dtype = (
+        cp.float32
+        if precision == "fp32"
+        else cp.float16
+        if precision == "fp16"
+        else cp.float32
+    )
     pool = cp.get_default_memory_pool()
     results: dict[str, Any] = {}
 
@@ -61,7 +68,9 @@ def bench_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: s
             a = cp.ones((batch_size, n, n), dtype=dtype)
             b = cp.ones((batch_size, n, n), dtype=dtype)
         except cp.cuda.memory.OutOfMemoryError as exc:
-            results[str(n)] = {"error": f"OOM allocating matmul inputs for size {n}: {exc}"}
+            results[str(n)] = {
+                "error": f"OOM allocating matmul inputs for size {n}: {exc}"
+            }
             continue
         except Exception as exc:
             results[str(n)] = {"error": f"allocation failed for size {n}: {exc}"}
@@ -147,16 +156,26 @@ void tiled_matmul(const float* __restrict__ A, const float* __restrict__ B, floa
     return cp.RawKernel(src, "tiled_matmul")
 
 
-def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
+def bench_tiled_matmul(
+    gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int
+) -> dict[str, Any]:
     """Benchmark matrix multiplication with a shared-memory tiled custom kernel."""
     cp.cuda.Device(gpu_index).use()
-    dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    dtype = (
+        cp.float32
+        if precision == "fp32"
+        else cp.float16
+        if precision == "fp16"
+        else cp.float32
+    )
     pool = cp.get_default_memory_pool()
     results: dict[str, Any] = {}
 
     if precision != "fp32":
         for n in sizes:
-            results[str(n)] = {"error": f"tiled matmul only supports fp32, got {precision}"}
+            results[str(n)] = {
+                "error": f"tiled matmul only supports fp32, got {precision}"
+            }
         return results
 
     pool.free_all_blocks()
@@ -165,7 +184,9 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
 
     for n in sizes:
         if n % block_size != 0:
-            results[str(n)] = {"error": f"size {n} not divisible by block size {block_size}"}
+            results[str(n)] = {
+                "error": f"size {n} not divisible by block size {block_size}"
+            }
             continue
 
         try:
@@ -180,9 +201,11 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
             results[str(n)] = {"error": f"allocation failed for size {n}: {exc}"}
             continue
 
-        grid = ((n + block_size - 1) // block_size,
-                (n + block_size - 1) // block_size,
-                batch_size)
+        grid = (
+            (n + block_size - 1) // block_size,
+            (n + block_size - 1) // block_size,
+            batch_size,
+        )
         block = (block_size, block_size, 1)
 
         n_runs = 5
@@ -220,7 +243,13 @@ def bench_tiled_matmul(gpu_index: int, sizes: list[int], iterations: int, precis
     return results
 
 
-def _attention_fits_memory(seq_len: int, batch_size: int, dtype_size: int, free_bytes: int, margin: float = 0.75) -> bool:
+def _attention_fits_memory(
+    seq_len: int,
+    batch_size: int,
+    dtype_size: int,
+    free_bytes: int,
+    margin: float = 0.75,
+) -> bool:
     """Check if attention kernel fits in available GPU memory."""
     n_heads = 8
     head_dim = 64
@@ -231,7 +260,9 @@ def _attention_fits_memory(seq_len: int, batch_size: int, dtype_size: int, free_
     return peak <= int(free_bytes * margin)
 
 
-def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int) -> dict[str, Any]:
+def bench_attention(
+    gpu_index: int, sizes: list[int], iterations: int, precision: str, batch_size: int
+) -> dict[str, Any]:
     """Benchmark scaled dot-product attention.
 
     Computes: softmax(Q @ K^T / sqrt(d)) @ V
@@ -240,7 +271,13 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
     Memory-safe: checks available memory per size, skips if insufficient.
     """
     cp.cuda.Device(gpu_index).use()
-    dtype = cp.float32 if precision == "fp32" else cp.float16 if precision == "fp16" else cp.float32
+    dtype = (
+        cp.float32
+        if precision == "fp32"
+        else cp.float16
+        if precision == "fp16"
+        else cp.float32
+    )
     n_heads = 8
     head_dim = 64
     results: dict[str, Any] = {}
@@ -250,13 +287,19 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
         pool.free_all_blocks()
         free_bytes, _ = cp.cuda.runtime.memGetInfo()
 
-        if not _attention_fits_memory(seq_len, batch_size, cp.dtype(dtype).itemsize, free_bytes):
-            peak_est = 3 * batch_size * n_heads * seq_len * head_dim * cp.dtype(dtype).itemsize
-            peak_est += batch_size * n_heads * seq_len * seq_len * cp.dtype(dtype).itemsize
+        if not _attention_fits_memory(
+            seq_len, batch_size, cp.dtype(dtype).itemsize, free_bytes
+        ):
+            peak_est = (
+                3 * batch_size * n_heads * seq_len * head_dim * cp.dtype(dtype).itemsize
+            )
+            peak_est += (
+                batch_size * n_heads * seq_len * seq_len * cp.dtype(dtype).itemsize
+            )
             peak_est = int(peak_est * 1.2)
             results[str(seq_len)] = {
                 "error": f"insufficient GPU memory for seq_len={seq_len}, bs={batch_size} "
-                         f"(need ~{peak_est // 1024**2} MB, avail ~{int(free_bytes * 0.75) // 1024**2} MB)"
+                f"(need ~{peak_est // 1024**2} MB, avail ~{int(free_bytes * 0.75) // 1024**2} MB)"
             }
             continue
 
@@ -265,13 +308,17 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
             k = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
             v = cp.ones((batch_size, n_heads, seq_len, head_dim), dtype=dtype)
         except cp.cuda.memory.OutOfMemoryError as exc:
-            results[str(seq_len)] = {"error": f"OOM allocating QKV for seq_len={seq_len}: {exc}"}
+            results[str(seq_len)] = {
+                "error": f"OOM allocating QKV for seq_len={seq_len}: {exc}"
+            }
             continue
         except Exception as exc:
-            results[str(seq_len)] = {"error": f"allocation failed for seq_len={seq_len}: {exc}"}
+            results[str(seq_len)] = {
+                "error": f"allocation failed for seq_len={seq_len}: {exc}"
+            }
             continue
 
-        scale = head_dim ** -0.5
+        scale = head_dim**-0.5
 
         n_runs = 5
         times: list[float] = []
@@ -302,10 +349,14 @@ def bench_attention(gpu_index: int, sizes: list[int], iterations: int, precision
                 elapsed_ms = cp.cuda.get_elapsed_time(start, end)
                 times.append(elapsed_ms / iterations)
         except cp.cuda.memory.OutOfMemoryError as exc:
-            results[str(seq_len)] = {"error": f"OOM during attention compute for seq_len={seq_len}: {exc}"}
+            results[str(seq_len)] = {
+                "error": f"OOM during attention compute for seq_len={seq_len}: {exc}"
+            }
             continue
         except Exception as exc:
-            results[str(seq_len)] = {"error": f"attention compute failed for seq_len={seq_len}: {exc}"}
+            results[str(seq_len)] = {
+                "error": f"attention compute failed for seq_len={seq_len}: {exc}"
+            }
             continue
 
         avg_ms = float(np.mean(times))
@@ -335,7 +386,9 @@ KERNEL_MAP = {
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="nvProbe Custom CUDA Kernels Benchmark")
+    parser = argparse.ArgumentParser(
+        description="nvProbe Custom CUDA Kernels Benchmark"
+    )
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--kernels", type=str, default="matmul")
     parser.add_argument("--sizes", type=str, default="512,1024,2048")
@@ -360,23 +413,29 @@ def main() -> None:
         pool.free_all_blocks()
         try:
             all_results[kernel_name] = bench_fn(
-                args.gpu, sizes, args.iterations, args.precision, args.batch_size,
+                args.gpu,
+                sizes,
+                args.iterations,
+                args.precision,
+                args.batch_size,
             )
         except cp.cuda.memory.OutOfMemoryError as exc:
             all_results[kernel_name] = {"error": f"GPU out of memory: {exc}"}
         except Exception as exc:
             all_results[kernel_name] = {"error": f"{type(exc).__name__}: {exc}"}
 
-    output_json({
-        "benchmark": "custom",
-        "gpu_model": gpu_info["model"],
-        "gpu_index": args.gpu,
-        "precision": args.precision,
-        "batch_size": args.batch_size,
-        "iterations": args.iterations,
-        "kernels": kernels,
-        "metrics": all_results,
-    })
+    output_json(
+        {
+            "benchmark": "custom",
+            "gpu_model": gpu_info["model"],
+            "gpu_index": args.gpu,
+            "precision": args.precision,
+            "batch_size": args.batch_size,
+            "iterations": args.iterations,
+            "kernels": kernels,
+            "metrics": all_results,
+        }
+    )
 
 
 if __name__ == "__main__":
