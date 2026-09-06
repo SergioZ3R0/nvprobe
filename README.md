@@ -28,13 +28,13 @@ pip install nvprobe && nvprobe setup && nvprobe run --local
 
 ## Features
 
-| **Bandwidth** | **MatMul / Attention** | **Conv2D** |
+| **Bandwidth** | **STREAM** | **MatMul / Attention** |
 |---|---|---|
-| H2D / D2H / D2D across buffer sizes | fp32, fp16, int8 custom CUDA kernels | 2D convolution benchmarks |
+| H2D / D2H / D2D across buffer sizes | COPY / SCALE / ADD / TRIAD sustainable bandwidth | fp32, fp16, int8 custom CUDA kernels |
 | **HPL** (FP64 Linpack) | **HPCG** | **MLPerf Inference** |
 | Datacenter GPUs: A100, H100, B200, L40S… | Conjugate Gradients | ONNX Runtime via cmx4mlperf |
-| **Memtest** | **Burn** | |
-| VRAM integrity: solid, checkerboard, random, walking-1 patterns | Sustained clock stability, thermal/power throttling detection | |
+| **Memtest** | **Burn** | **AI Accelerator Score** |
+| VRAM integrity: solid, checkerboard, random, walking-1 patterns | Sustained clock stability, thermal/power throttling detection | Normalized performance scoring vs H100 baseline |
 
 - **Bundled CUDA runtime** &mdash; CuPy `[ctk]` via pip, no system toolkit required
 - **Auto-downloaded HPC tools** &mdash; NVIDIA HPC Benchmarks cached in `~/.nvprobe/tools/`
@@ -67,6 +67,7 @@ pip install -e . && nvprobe setup && nvprobe run --local
 | Command | Description |
 |---------|-------------|
 | `nvprobe compare --a results/run1 --b results/run2` | Compare two runs |
+| `nvprobe score --bandwidth 3350 --compute fp32=67,fp8=268` | Calculate AI accelerator score |
 | `nvprobe run --config configs/cluster.yaml` | Run with custom YAML config |
 | `nvprobe slurm submit --config configs/cluster.yaml` | Submit Slurm job |
 | `nvprobe slurm status` | Check Slurm job status |
@@ -77,6 +78,7 @@ pip install -e . && nvprobe setup && nvprobe run --local
 Chart.js canvas-based charts with interactive controls:
 
 - **Bandwidth** &mdash; filter by GPU and transfer type (H2D / D2H / D2D)
+- **STREAM** &mdash; filter by GPU and operation (COPY / SCALE / ADD / TRIAD)
 - **MatMul / Attention** &mdash; filter by GPU and precision (fp32 / fp16)
 - **Burn** &mdash; time-series line chart of SM/MEM clocks and temperature over sustained load
 - **Memtest** &mdash; bar chart of detected VRAM errors per test pattern
@@ -117,16 +119,19 @@ nvprobe/
 │   └── benchmarks/
 │       ├── base.py                # Base class, GPU detection, diagnostics
 │       ├── bandwidth.py           # Memory bandwidth tests
+│       ├── stream.py              # STREAM sustainable bandwidth
 │       ├── burn.py                # Sustained burn / throttling detection
 │       ├── custom.py              # Custom CUDA kernels
 │       ├── hpl.py                 # HPL wrapper
 │       ├── hpcg.py                # HPCG wrapper
 │       ├── memtest.py             # VRAM integrity test
 │       ├── mlperf.py              # MLPerf via cmx4mlperf
+│       ├── score.py               # AI Accelerator Score calculator
 │       └── _cuda/                 # Raw CUDA kernels
 ├── configs/
 │   ├── default.yaml
 │   └── local.yaml
+├── .github/workflows/ci.yml      # GitHub Actions CI/CD
 ├── nvprobe.svg
 ├── index.html
 ├── README.md
