@@ -163,6 +163,7 @@
     <a href="#config-hpl">hpl</a>
     <a href="#config-hpcg">hpcg</a>
     <a href="#config-mlperf">mlperf</a>
+    <a href="#config-score">score</a>
     <div class="sidebar-section">Guides</div>
     <a href="#example-configs">Example Configs</a>
     <a href="#how-benchmarks-work">How Benchmarks Work</a>
@@ -325,6 +326,19 @@ On Blackwell GPUs ensure OpenMPI &ge; 5.x — older MPI versions may segfault.</
 <span class="kw">    implementation:</span> reference
 <span class="kw">    test_query_count:</span> 100
 </code></pre>
+
+<h3 id="config-score">score</h3>
+<p>The AI Accelerator Score is a CLI command (not a benchmark) that calculates normalized performance scores for AI accelerators.</p>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    <tr><td><code>--name</code></td><td>str</td><td>No</td><td>Accelerator name for display (default: "accelerator")</td></tr>
+    <tr><td><code>--bandwidth</code></td><td>float</td><td>Yes</td><td>Sustained memory bandwidth in GB/s</td></tr>
+    <tr><td><code>--compute</code></td><td>str</td><td>Yes</td><td>Compute throughput per precision (e.g., fp32=67,fp16=134,fp8=268)</td></tr>
+</table>
+<pre><code><span class="cmd">nvprobe score --name "H100 SXM" --bandwidth 3350 --compute fp32=67,bf16=134,fp16=134,fp8=268,int8=268</span>
+</code></pre>
+<p>Output includes per-precision breakdown, Global Performance (GP), and Normalized Score (H100 = 1.00).
+Uses Roofline-inspired model: P[p] = min(C[p], BW × I_stream[p] / f).</p>
 
 <!-- ─────────────────────────────────────────────────────────────── -->
 
