@@ -724,5 +724,68 @@ def config_validate(
         raise typer.Exit(1)
 
 
+@app.command()
+def score(
+    name: str = typer.Option(
+        "accelerator",
+        "--name",
+        "-n",
+        help="Accelerator name for display.",
+    ),
+    bandwidth: float = typer.Option(
+        ...,
+        "--bandwidth",
+        "-b",
+        help="Sustained memory bandwidth in GB/s.",
+    ),
+    compute: str = typer.Option(
+        ...,
+        "--compute",
+        "-c",
+        help="Compute throughput per precision (e.g., fp32=51,fp16=102,fp8=204).",
+    ),
+) -> None:
+    """Calculate AI accelerator performance score."""
+    from nvprobe.benchmarks.score import calculate_h100_baseline, score_accelerator
+
+    # Parse compute string: "fp32=51,fp16=102" -> {"fp32": 51.0, "fp16": 102.0}
+    compute_by_precision: dict[str, float] = {}
+    for item in compute.split(","):
+        if "=" in item:
+            prec, val = item.split("=", 1)
+            try:
+                compute_by_precision[prec.strip()] = float(val.strip())
+            except ValueError:
+                console.print(f"[red]Invalid compute value:[/red] {item}")
+                raise typer.Exit(1)
+
+    if not compute_by_precision:
+        console.print("[red]No compute values provided.[/red]")
+        raise typer.Exit(1)
+
+    # Calculate H100 baseline dynamically
+    baseline_gp = calculate_h100_baseline()
+    result = score_accelerator(name, bandwidth, compute_by_precision, baseline_gp)
+
+    # Display results
+    console.print(f"\n[bold green]AI Accelerator Score: {result.name}[/bold green]\n")
+    console.print(f"Memory Bandwidth:     {result.bandwidth_gbs:.1f} GB/s")
+    console.print(f"Global Performance:   {result.global_performance:.4f}")
+    console.print(f"Normalized Score:     {result.normalized_score:.4f} (H100 = 1.00)")
+    console.print(f"H100 Baseline GP:     {baseline_gp:.4f}")
+
+    console.print("\n[bold]Per-Precision Breakdown:[/bold]")
+    console.print(
+        f"{'Precision':<10} {'TFLOPS':<12} {'I_stream':<10} {'Weight':<10} {'P[p]':<12} {'Weighted':<12}"
+    )
+    console.print("-" * 66)
+
+    for p in sorted(result.precisions.values(), key=lambda x: x.weight, reverse=True):
+        console.print(
+            f"{p.precision:<10} {p.compute_tflops:<12.1f} {p.i_stream:<10.3f} "
+            f"{p.weight:<10.4f} {p.performance_score:<12.4f} {p.weighted_score:<12.4f}"
+        )
+
+
 if __name__ == "__main__":
     app()
