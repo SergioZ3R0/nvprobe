@@ -746,7 +746,7 @@ def score(
     ),
 ) -> None:
     """Calculate AI accelerator performance score."""
-    from nvprobe.benchmarks.score import H100_BASELINE_GP, score_accelerator
+    from nvprobe.benchmarks.score import calculate_h100_baseline, score_accelerator
 
     # Parse compute string: "fp32=51,fp16=102" -> {"fp32": 51.0, "fp16": 102.0}
     compute_by_precision: dict[str, float] = {}
@@ -763,14 +763,16 @@ def score(
         console.print("[red]No compute values provided.[/red]")
         raise typer.Exit(1)
 
-    result = score_accelerator(name, bandwidth, compute_by_precision)
+    # Calculate H100 baseline dynamically
+    baseline_gp = calculate_h100_baseline()
+    result = score_accelerator(name, bandwidth, compute_by_precision, baseline_gp)
 
     # Display results
     console.print(f"\n[bold green]AI Accelerator Score: {result.name}[/bold green]\n")
     console.print(f"Memory Bandwidth:     {result.bandwidth_gbs:.1f} GB/s")
     console.print(f"Global Performance:   {result.global_performance:.4f}")
     console.print(f"Normalized Score:     {result.normalized_score:.4f} (H100 = 1.00)")
-    console.print(f"H100 Baseline GP:     {H100_BASELINE_GP:.4f}")
+    console.print(f"H100 Baseline GP:     {baseline_gp:.4f}")
 
     console.print("\n[bold]Per-Precision Breakdown:[/bold]")
     console.print(

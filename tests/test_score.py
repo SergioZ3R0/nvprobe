@@ -1,9 +1,10 @@
 """Tests for AI Accelerator Score calculator."""
 
 from nvprobe.benchmarks.score import (
-    H100_BASELINE_GP,
+    H100_REFERENCE_SPECS,
     AcceleratorScore,
     calculate_global_performance,
+    calculate_h100_baseline,
     calculate_normalized_score,
     calculate_performance_score,
     compare_accelerators,
@@ -91,16 +92,38 @@ def test_global_performance_weighted_sum() -> None:
     assert abs(gp - expected) < 1e-10
 
 
-def test_normalized_score_h100_baseline() -> None:
-    """H100 baseline should normalize to 1.0."""
-    normalized = calculate_normalized_score(H100_BASELINE_GP)
-    assert abs(normalized - 1.0) < 1e-6
+def test_h100_baseline_calculation() -> None:
+    """H100 baseline should be calculated from reference specs."""
+    baseline = calculate_h100_baseline()
+    # H100 specs: fp32=67, bf16=134, fp16=134, fp8=268, int8=268
+    # GP = 0.05*67 + 0.175*134 + 0.175*134 + 0.1875*268 + 0.1875*268
+    # GP = 3.35 + 23.45 + 23.45 + 50.25 + 50.25 = 150.75
+    assert abs(baseline - 150.75) < 0.01
 
 
-def test_normalized_score_higher_than_h100() -> None:
-    """Score higher than H100 baseline should normalize to > 1.0."""
-    normalized = calculate_normalized_score(H100_BASELINE_GP * 2)
-    assert normalized > 1.0
+def test_h100_normalized_to_one() -> None:
+    """H100 with reference specs should normalize to 1.0."""
+    baseline = calculate_h100_baseline()
+    result = score_accelerator(
+        "H100 SXM",
+        H100_REFERENCE_SPECS["bandwidth_gbs"],
+        H100_REFERENCE_SPECS["compute_tflops"],
+        baseline,
+    )
+    assert abs(result.normalized_score - 1.0) < 1e-6
+
+
+def test_normalized_score_with_custom_baseline() -> None:
+    """Normalized score should use provided baseline."""
+    baseline = 100.0
+    normalized = calculate_normalized_score(200.0, baseline)
+    assert normalized == 2.0
+
+
+def test_normalized_score_zero_baseline() -> None:
+    """Normalized score should be 0 when baseline is 0."""
+    normalized = calculate_normalized_score(100.0, 0.0)
+    assert normalized == 0.0
 
 
 def test_score_accelerator_complete() -> None:
@@ -117,6 +140,7 @@ def test_score_accelerator_complete() -> None:
     assert "fp16" in result.precisions
     assert result.global_performance > 0
     assert result.normalized_score > 0
+    assert result.baseline_gp > 0
 
 
 def test_score_accelerator_to_dict() -> None:
@@ -133,6 +157,7 @@ def test_score_accelerator_to_dict() -> None:
     assert "fp32" in d["precisions"]
     assert "normalized_score" in d
     assert "global_performance" in d
+    assert "baseline_gp" in d
 
 
 def test_compare_accelerators_ranking() -> None:
@@ -156,6 +181,24 @@ def test_compare_accelerators_empty() -> None:
     assert result["rankings"] == []
 
 
-def test_h100_baseline_value() -> None:
-    """H100 baseline should be 501.08."""
-    assert H100_BASELINE_GP == 501.08
+def test_h100_b200_ratio() -> None:
+    """B200 should score higher than H100."""
+    baseline = calculate_h100_baseline()
+
+    h100 = score_accelerator(
+        "H100 SXM",
+        H100_REFERENCE_SPECS["bandwidth_gbs"],
+        H100_REFERENCE_SPECS["compute_tflops"],
+        baseline,
+    )
+
+    b200 = score_accelerator(
+        "B200",
+        8000.0,
+        {"fp32": 90.0, "bf16": 180.0, "fp16": 180.0, "fp8": 360.0, "int8": 360.0},
+        baseline,
+    )
+
+    # B200 should have ~34% more compute than H100
+    assert b200.normalized_score > h100.normalized_score
+    assert abs(b200.normalized_score / h100.normalized_score - 1.34) < 0.01
