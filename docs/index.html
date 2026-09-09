@@ -34,7 +34,7 @@
         "name": "nvprobe",
         "operatingSystem": "Linux",
         "applicationCategory": "DeveloperApplication",
-        "description": "Automate CUDA workloads, run HPL & HPCG, profile custom kernels, benchmark MLPerf inference, compare hardware, and generate interactive HTML reports — all from a single CLI.",
+        "description": "NVIDIA GPU & CUDA Benchmark Suite. Automate CUDA workloads, run HPL & HPCG, profile custom kernels, benchmark MLPerf inference, compare hardware, and generate interactive HTML reports — all from a single CLI.",
         "url": "https://nvprobe.scszero.com/",
         "sameAs": "https://github.com/SergioZ3R0/nvprobe",
         "offers": {
@@ -46,7 +46,28 @@
             "@type": "Person",
             "name": "SergioZ3R0",
             "url": "https://github.com/SergioZ3R0"
-        }
+        },
+        "softwareHelp": {
+            "@type": "WebPage",
+            "url": "https://nvprobe.scszero.com/docs.html"
+        },
+        "featureList": [
+            "Memory bandwidth benchmark (H2D/D2H/D2D)",
+            "STREAM sustainable bandwidth (COPY/SCALE/ADD/TRIAD)",
+            "HPL High Performance Linpack",
+            "HPCG Conjugate Gradients",
+            "MLPerf Inference via cmx4mlperf",
+            "Custom CUDA kernels (matmul, attention, convolution)",
+            "VRAM integrity memtest",
+            "Sustained burn test with throttling detection",
+            "AI Accelerator Score calculator",
+            "Interactive HTML reports with Chart.js",
+            "Slurm HPC cluster integration"
+        ],
+        "downloadUrl": "https://pypi.org/project/nvprobe/",
+        "installUrl": "https://pypi.org/project/nvprobe/",
+        "programmingLanguage": "Python",
+        "runtimePlatform": "Python 3.10+"
     }
     </script>
 
