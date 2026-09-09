@@ -6,7 +6,8 @@
 <p align="center">
   <b>NVIDIA GPU &amp; CUDA Benchmark Suite</b><br>
   <i>Automate CUDA workloads &bull; HPL &amp; HPCG &bull; MLPerf inference &bull; Custom kernels &bull; Interactive reports</i><br>
-  <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a>
+  <a href="https://nvprobe.scszero.com/">nvprobe.scszero.com</a> &nbsp;|&nbsp;
+  <a href="https://nvprobe.scszero.com/docs.html">Documentation</a>
 </p>
 
 <p align="center">
