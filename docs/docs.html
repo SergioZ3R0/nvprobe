@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation — nvprobe</title>
+    <title>Documentation, nvprobe</title>
     <link rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect x='50' y='50' width='100' height='100' rx='12' fill='%231e1e1e' stroke='%2339FF88' stroke-width='4'/%3E%3Cpath d='M 35 70 h 15 M 35 100 h 15 M 35 130 h 15 M 150 70 h 15 M 150 100 h 15 M 150 130 h 15 M 70 35 v 15 M 100 35 v 15 M 130 35 v 15 M 70 150 v 15 M 100 150 v 15 M 130 150 v 15' stroke='%2339FF88' stroke-width='4' stroke-linecap='round'/%3E%3Cpolyline points='65,110 85,110 100,75 115,120 135,95' fill='none' stroke='%2339FF88' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
     <meta name="description" content="nvprobe documentation: benchmark config reference, example configs, how benchmarks work, Slurm quickstart, and environment diagnostics.">
     <!-- Open Graph -->
     <meta property="og:type" content="article">
-    <meta property="og:title" content="Documentation — nvprobe">
+    <meta property="og:title" content="Documentation, nvprobe">
     <meta property="og:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
     <meta property="og:url" content="https://nvprobe.scszero.com/docs.html">
     <meta property="og:site_name" content="nvprobe">
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Documentation — nvprobe">
+    <meta name="twitter:title" content="Documentation, nvprobe">
     <meta name="twitter:description" content="Reference guide for nvprobe: CLI configuration, GPU benchmarking, Slurm cluster execution, and CUDA environment diagnostics.">
     <link rel="canonical" href="https://nvprobe.scszero.com/docs.html">
 
@@ -208,7 +208,7 @@
 
 <h1 id="intro"><span class="nv">nv</span><span class="pr">probe</span> Documentation</h1>
 <p class="intro">
-    nvprobe runs its own optimized CUDA workloads via CuPy and cuBLAS — no external model files,
+    nvprobe runs its own optimized CUDA workloads via CuPy and cuBLAS, no external model files,
     no PyTorch/TensorFlow wrappers. Every benchmark is self-contained.
     Install, configure, and get GPU performance numbers in minutes.
 </p>
@@ -317,7 +317,7 @@ Throttling is flagged if the SM clock drops &gt;15 % from its initial value.</p>
 <span class="kw">    binary:</span> <span class="cm">"~/.nvprobe/tools/xhpl"</span>
 </code></pre>
 <div class="note"><strong>Datacenter GPUs only</strong> (A100, H100, B200, L40S). RTX cards may crash (SIGSEGV).
-On Blackwell GPUs ensure OpenMPI &ge; 5.x — older MPI versions may segfault.</div>
+On Blackwell GPUs ensure OpenMPI &ge; 5.x, older MPI versions may segfault.</div>
 
 <h3 id="config-hpcg">hpcg</h3>
 <table>
@@ -343,7 +343,7 @@ On Blackwell GPUs ensure OpenMPI &ge; 5.x — older MPI versions may segfault.</
     <tr><td><code>implementation</code></td><td>str</td><td><code>reference</code></td><td>MLPerf implementation</td></tr>
     <tr><td><code>test_query_count</code></td><td>int</td><td><code>100</code></td><td>Number of queries for test mode</td></tr>
     <tr><td><code>mode</code></td><td>str</td><td><code>test</code></td><td><code>test</code>, <code>find_performance</code>, or <code>full</code></td></tr>
-    <tr><td><code>batch_size</code></td><td>int</td><td>—</td><td>Optional custom batch size override</td></tr>
+    <tr><td><code>batch_size</code></td><td>int</td><td>-</td><td>Optional custom batch size override</td></tr>
 </table>
 <pre><code class="language-yaml"><span class="kw">- name:</span> mlperf
 <span class="kw">  enabled:</span> false  <span class="cm"># requires: pip install cmx4mlperf</span>
@@ -447,13 +447,13 @@ Output is captured as JSON, parsed, and stored in the local SQLite database.
 </p>
 
 <ul>
-    <li><strong>bandwidth, memtest, burn</strong> — use CuPy + NumPy.
+    <li><strong>bandwidth, memtest, burn</strong>, use CuPy + NumPy.
         No CUDA toolkit required.</li>
-    <li><strong>custom</strong> — requires CuPy with <code>[ctk]</code> extras
+    <li><strong>custom</strong>, requires CuPy with <code>[ctk]</code> extras
         (CUDA toolkit headers for JIT kernel compilation).</li>
-    <li><strong>hpl, hpcg</strong> — call NVIDIA HPC Benchmarks binaries
+    <li><strong>hpl, hpcg</strong>, call NVIDIA HPC Benchmarks binaries
         (<code>xhpl</code> / <code>xhpch</code>) via MPI.</li>
-    <li><strong>mlperf</strong> — drives <code>cmx4mlperf</code>
+    <li><strong>mlperf</strong>, drives <code>cmx4mlperf</code>
         (the MLCommons cm framework).</li>
 </ul>
 
@@ -512,9 +512,9 @@ the benchmark results. The HTML report shows these fields in the Environment tab
     <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
     <tr><td>GPU model</td><td>nvidia-smi</td><td>Hostname appended in Slurm merged reports</td></tr>
     <tr><td>Memory total</td><td>nvidia-smi</td><td>MiB</td></tr>
-    <tr><td>SM Clock (max)</td><td><code>clocks.max.sm</code></td><td>Hardware ceiling — detects degraded silicon</td></tr>
+    <tr><td>SM Clock (max)</td><td><code>clocks.max.sm</code></td><td>Hardware ceiling, detects degraded silicon</td></tr>
     <tr><td>Mem Clock (max)</td><td><code>clocks.max.mem</code></td><td>Hardware ceiling</td></tr>
-    <tr><td>Power Limit</td><td><code>power.limit</code></td><td>Watts — N/A on WDDM (Windows)</td></tr>
+    <tr><td>Power Limit</td><td><code>power.limit</code></td><td>Watts, N/A on WDDM (Windows)</td></tr>
     <tr><td>ECC mode</td><td><code>ecc.mode.current</code></td><td>Enabled / Disabled / N/A</td></tr>
     <tr><td>ECC errors</td><td><code>ecc.errors.corrected / uncorrected</code></td><td>Cumulative volatile counts</td></tr>
     <tr><td>PCIe link (max)</td><td><code>pcie.link.gen.max</code> × <code>pcie.link.width.max</code></td><td>Maximum negotiated link speed</td></tr>

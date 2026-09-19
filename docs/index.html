@@ -34,7 +34,7 @@
         "name": "nvprobe",
         "operatingSystem": "Linux",
         "applicationCategory": "DeveloperApplication",
-        "description": "NVIDIA GPU & CUDA Benchmark Suite. Automate CUDA workloads, run HPL & HPCG, profile custom kernels, benchmark MLPerf inference, compare hardware, and generate interactive HTML reports — all from a single CLI.",
+        "description": "Automate CUDA workloads, run HPL & HPCG, profile custom kernels, benchmark MLPerf inference, compare hardware, and generate interactive HTML reports, all from a single CLI.",
         "url": "https://nvprobe.scszero.com/",
         "sameAs": "https://github.com/SergioZ3R0/nvprobe",
         "offers": {
@@ -390,7 +390,7 @@
             <p>
                 Baseline GPUs at delivery, run HPL &amp; HPCG, test VRAM integrity,
                 detect thermal throttling, benchmark MLPerf inference, and generate
-                interactive HTML reports — all from a single CLI.
+                interactive HTML reports, all from a single CLI.
             </p>
             <div class="badge-wrap">
                 <span class="badge badge-py">Python 3.10+</span>
@@ -421,12 +421,12 @@
                     <article class="feature">
                         <div class="icon" role="img" aria-label="chart icon">📊</div>
                         <h3>Pre-built Benchmarks</h3>
-                        <p>Memory bandwidth, matmul, attention, convolution — run standard CUDA workloads with zero setup.</p>
+                        <p>Memory bandwidth, matmul, attention, convolution, run standard CUDA workloads with zero setup.</p>
                     </article>
                     <article class="feature">
                         <div class="icon" role="img" aria-label="racing car icon">🏎️</div>
                         <h3>HPL &amp; HPCG</h3>
-                        <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks — auto-downloaded on setup.</p>
+                        <p>Self-contained Linpack and CG benchmarks via NVIDIA HPC Benchmarks, auto-downloaded on setup.</p>
                     </article>
                     <article class="feature">
                         <div class="icon" role="img" aria-label="brain icon">🧠</div>
@@ -436,7 +436,7 @@
                     <article class="feature">
                         <div class="icon" role="img" aria-label="chart with upwards trend icon">📈</div>
                         <h3>Infrastructure Audits</h3>
-                        <p>Capture max clocks, power caps, ECC state, PCIe link speed &amp; NVLink — baseline today, re-run in 6 months, spot degradation instantly.</p>
+                        <p>Capture max clocks, power caps, ECC state, PCIe link speed &amp; NVLink, baseline today, re-run in 6 months, spot degradation instantly.</p>
                     </article>
                     <article class="feature">
                         <div class="icon" role="img" aria-label="graph icon">📊</div>
@@ -446,12 +446,12 @@
                     <article class="feature">
                         <div class="icon" role="img" aria-label="package icon">📦</div>
                         <h3>Bundled CUDA Runtime</h3>
-                        <p>No system CUDA toolkit required — CuPy with <code>[ctk]</code> bundles everything via pip.</p>
+                        <p>No system CUDA toolkit required, CuPy with <code>[ctk]</code> bundles everything via pip.</p>
                     </article>
                     <article class="feature">
                         <div class="icon" role="img" aria-label="desktop computer icon">🖥️</div>
                         <h3>Slurm Integration</h3>
-                        <p>Generate, submit, monitor, and collect results from HPC clusters — all from a single CLI.</p>
+                        <p>Generate, submit, monitor, and collect results from HPC clusters, all from a single CLI.</p>
                     </article>
                 </div>
             </section>
@@ -569,7 +569,7 @@
                     </article>
                     <article class="benchmark-card">
                         <h3>MLPerf</h3>
-                        <p>MLPerf Inference — test / find_performance / full</p>
+                        <p>MLPerf Inference, test / find_performance / full</p>
                         <span class="tag">ONNX Runtime</span>
                     </article>
                 </div>
@@ -580,7 +580,7 @@
                 <div class="faq">
                     <details>
                         <summary>Can I run nvprobe on a workstation RTX GPU for HPL and HPCG benchmarks?</summary>
-                        <p>The NVIDIA HPC Benchmarks binaries (<code>xhpl</code> and <code>xhpch</code>) are validated for datacenter GPUs such as A100, H100, B200, and L40S. On RTX-series workstation cards the GPU initialization step may crash with a SIGSEGV. However, all other benchmarks — memory bandwidth, custom CUDA kernels (matmul, attention, convolution), and MLPerf inference — work on any CUDA-capable GPU. You can selectively disable HPL and HPCG in your YAML config and still run the full suite of bandwidth and custom kernel tests.</p>
+                        <p>The NVIDIA HPC Benchmarks binaries (<code>xhpl</code> and <code>xhpch</code>) are validated for datacenter GPUs such as A100, H100, B200, and L40S. On RTX-series workstation cards the GPU initialization step may crash with a SIGSEGV. However, all other benchmarks, memory bandwidth, custom CUDA kernels (matmul, attention, convolution), and MLPerf inference, work on any CUDA-capable GPU. You can selectively disable HPL and HPCG in your YAML config and still run the full suite of bandwidth and custom kernel tests.</p>
                     </details>
                     <details>
                         <summary>How does nvprobe handle MLPerf Inference setup and cuDNN detection?</summary>

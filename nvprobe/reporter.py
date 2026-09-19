@@ -1,4 +1,4 @@
-"""HTML report generator — self-contained reports with Chart.js interactive charts."""
+"""HTML report generator, self-contained reports with Chart.js interactive charts."""
 
 from __future__ import annotations
 
@@ -687,7 +687,7 @@ def _chart_hpl(results: list[dict[str, Any]]) -> str:
                 },
             },
         },
-        title="HPL — High Performance Linpack",
+        title="HPL, High Performance Linpack",
         aspect_ratio=1.8,
     )
 
